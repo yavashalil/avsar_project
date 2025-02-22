@@ -35,10 +35,10 @@ class _AdminScreenState extends State<AdminScreen> {
           });
         }
       } else {
-        print("⚠️ Kullanıcılar yüklenemedi! Hata kodu: ${response.statusCode}");
+        print("Kullanıcılar yüklenemedi! Hata kodu: ${response.statusCode}");
       }
     } catch (e) {
-      print("⚠️ Kullanıcıları çekerken hata oluştu: $e");
+      print("Kullanıcıları çekerken hata oluştu: $e");
     }
   }
 

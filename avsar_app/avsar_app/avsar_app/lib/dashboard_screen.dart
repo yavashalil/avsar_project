@@ -15,7 +15,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String username = "Bilinmiyor";
   String unit = "Bilinmiyor";
   List<Map<String, dynamic>> files = []; // API'den gelen dosyalar
-  bool isLoadingFiles = true; // Yükleme durumunu takip et
+  bool isLoadingFiles = true;
 
   final String baseUrl = "http://192.168.2.100:5000";
 
@@ -30,19 +30,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       username = prefs.getString('username') ?? "Bilinmiyor";
-      unit = prefs.getString('unit') ??
-          "Bilinmiyor"; // Artık kaydedildiğinden emin ol
+      unit = prefs.getString('unit') ?? "Bilinmiyor";
     });
   }
 
-  // API'den dosya listesini çek
   Future<void> fetchFiles() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/files/'));
       if (response.statusCode == 200) {
         setState(() {
           files = List<Map<String, dynamic>>.from(jsonDecode(response.body));
-          isLoadingFiles = false; // Yükleme tamamlandı
+          isLoadingFiles = false;
         });
       } else {
         print("Dosyalar yüklenemedi! Hata kodu: ${response.statusCode}");
@@ -61,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Dosya açma işlemi
   void openFile(String fileName) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("📂 $fileName açılıyor...")),
+      SnackBar(content: Text(" $fileName açılıyor...")),
     );
   }
 
@@ -122,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 📂 DOSYA LİSTESİ
+            //  DOSYA LİSTESİ
             const Text(
               "📂 Dosyalar",
               style: TextStyle(
@@ -134,9 +132,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             Expanded(
               child: isLoadingFiles
-                  ? const Center(
-                      child:
-                          CircularProgressIndicator()) // Yükleniyor animasyonu
+                  ? const Center(child: CircularProgressIndicator())
                   : files.isEmpty
                       ? const Center(
                           child: Text("📁 Henüz yüklenmiş dosya yok.",
@@ -167,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const Divider(),
 
-            // 🛠️ ÇIKIŞ
+            //  ÇIKIŞ
             Center(
               child: ElevatedButton.icon(
                 onPressed: logout,

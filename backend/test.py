@@ -34,7 +34,7 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# 🔹 **Tüm kullanıcıları getir**
+#  **Tüm kullanıcıları getir**
 @app.get("/users/", response_model=List[User])
 def get_users():
     cursor.execute("SELECT name, unit, role, username, password FROM users")
@@ -44,7 +44,7 @@ def get_users():
         for u in users
     ]
 
-# 🔹 **Yeni kullanıcı ekle**
+#  **Yeni kullanıcı ekle**
 @app.post("/users/")
 def add_user(user: User):
     hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -59,7 +59,7 @@ def add_user(user: User):
 
     return {"message": "Kullanıcı başarıyla eklendi"}
 
-# 🔹 **Kullanıcı güncelle**
+#  **Kullanıcı güncelle**
 @app.put("/users/{username}")
 def update_user(username: str, user: User):
     cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
@@ -81,7 +81,7 @@ def update_user(username: str, user: User):
     conn.commit()
     return {"message": "Kullanıcı başarıyla güncellendi"}
 
-# 🔹 **Kullanıcı giriş yap**
+#  **Kullanıcı giriş yap**
 @app.post("/login")
 def login(user: LoginRequest):
     cursor.execute("SELECT password, role, unit FROM users WHERE username = ?", (user.username,))
@@ -94,10 +94,10 @@ def login(user: LoginRequest):
         "message": "Giriş başarılı",
         "username": user.username,
         "role": result[1],
-        "unit": result[2]  # ✅ Birim Bilgisi Eklendi!
+        "unit": result[2] 
     }
 
-# 🔹 **Kullanıcıyı sil**
+#  **Kullanıcıyı sil**
 @app.delete("/users/{username}")
 def delete_user(username: str):
     cursor.execute("DELETE FROM users WHERE username = ?", (username,))
@@ -108,7 +108,7 @@ def delete_user(username: str):
 
     return {"message": f"Kullanıcı '{username}' başarıyla silindi"}
 
-# 🔹 **Birim bazlı kullanıcı sil**
+#  **Birim bazlı kullanıcı sil**
 @app.delete("/users/{unit}/{username}")
 def delete_user_from_unit(unit: str, username: str):
     cursor.execute("DELETE FROM users WHERE unit = ? AND username = ?", (unit, username))
@@ -119,7 +119,7 @@ def delete_user_from_unit(unit: str, username: str):
 
     return {"message": f"{unit} biriminden '{username}' başarıyla silindi."}
 
-# 🔹 **Birimdeki tüm kullanıcıları sil**
+#  **Birimdeki tüm kullanıcıları sil**
 @app.delete("/users/{unit}/")
 def delete_all_users_from_unit(unit: str):
     cursor.execute("DELETE FROM users WHERE unit = ?", (unit,))
@@ -130,5 +130,5 @@ def delete_all_users_from_unit(unit: str):
 
     return {"message": f"{unit} birimindeki tüm kullanıcılar silindi."}
 
-# ✅ Backend'i çalıştırmak için:
+# Backend'i çalıştırmak için:
 # python -m uvicorn test:app --host 192.168.2.100 --port 5000

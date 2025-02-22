@@ -63,7 +63,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
           Navigator.pop(context, true);
         } else {
           print(
-              "⚠️ Güncelleme başarısız: ${response.statusCode} - ${response.body}");
+              "Güncelleme başarısız: ${response.statusCode} - ${response.body}");
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content:
@@ -71,7 +71,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
           );
         }
       } catch (e) {
-        print("⚠️ Kullanıcı güncellerken hata oluştu: $e");
+        print("Kullanıcı güncellerken hata oluştu: $e");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Beklenmeyen bir hata oluştu!")),
         );

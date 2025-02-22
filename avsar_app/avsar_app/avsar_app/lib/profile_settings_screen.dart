@@ -32,7 +32,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         selectedLanguage = prefs.getString('language') ?? "Türkçe";
       });
     } catch (e) {
-      print("⚠️ Kullanıcı verileri yüklenirken hata oluştu: $e");
+      print("Kullanıcı verileri yüklenirken hata oluştu: $e");
     }
   }
 
@@ -60,7 +60,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 String newPassword = _passwordController.text.trim();
                 if (newPassword.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("⚠️ Şifre boş olamaz!")),
+                    const SnackBar(content: Text("Şifre boş olamaz!")),
                   );
                   return;
                 }
@@ -69,13 +69,13 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text("✅ Şifre başarıyla güncellendi.")),
+                        content: Text("Şifre başarıyla güncellendi.")),
                   );
                   Navigator.pop(context);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text("⚠️ Şifre güncelleme başarısız!")),
+                        content: Text("Şifre güncelleme başarısız!")),
                   );
                 }
               },
@@ -100,11 +100,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         return true;
       } else {
         print(
-            "⚠️ Şifre değişikliği başarısız! HTTP Hata Kodu: ${response.statusCode}");
+            "Şifre değişikliği başarısız! HTTP Hata Kodu: ${response.statusCode}");
         return false;
       }
     } catch (e) {
-      print("⚠️ API çağrısı başarısız: $e");
+      print("API çağrısı başarısız: $e");
       return false;
     }
   }
@@ -131,7 +131,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                      content: Text("✅ Dil değiştirildi: $selectedLanguage")),
+                      content: Text("Dil değiştirildi: $selectedLanguage")),
                 );
                 Navigator.pop(context);
               }
