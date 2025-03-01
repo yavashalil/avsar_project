@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
 
 class FileManagementScreen extends StatefulWidget {
-  const FileManagementScreen({super.key});
+  const FileManagementScreen({super.key, required String baseUrl});
 
   @override
   _FileManagementScreenState createState() => _FileManagementScreenState();
 }
 
 class _FileManagementScreenState extends State<FileManagementScreen> {
-  // Örnek dosya listesi
   List<Map<String, String>> files = [
     {"name": "Rapor.pdf", "date": "02.02.2024"},
     {"name": "ToplantıNotları.docx", "date": "01.02.2024"},
   ];
 
-  // Dosya Silme İşlemi
   void _deleteFile(int index) {
     setState(() {
       files.removeAt(index);
     });
   }
 
-  // Dosya Yükleme İşlemi (Geçici olarak sadece listeye ekler)
   void _uploadFile() {
     setState(() {
       files.add({"name": "YeniDosya.txt", "date": "03.02.2024"});
@@ -32,7 +29,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true, 
+        centerTitle: true,
         title: const Text(
           "Dosya Yönetimi",
           style: TextStyle(
@@ -42,10 +39,9 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         ),
         backgroundColor: Colors.purple,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: Colors.white), 
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
-            Navigator.pop(context); 
+            Navigator.pop(context);
           },
         ),
       ),
@@ -54,7 +50,6 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dosya Listesi
             Expanded(
               child: ListView.builder(
                 itemCount: files.length,
@@ -80,7 +75,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
                         style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       ),
                       trailing: Wrap(
-                        spacing: -8, 
+                        spacing: -8,
                         children: [
                           IconButton(
                             icon:
@@ -107,8 +102,6 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
                 },
               ),
             ),
-
-            // [+ Yeni Dosya Yükle] Butonu
             Center(
               child: ElevatedButton.icon(
                 onPressed: _uploadFile,

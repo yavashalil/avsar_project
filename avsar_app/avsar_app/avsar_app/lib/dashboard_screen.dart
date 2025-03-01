@@ -14,7 +14,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String username = "Bilinmiyor";
   String unit = "Bilinmiyor";
-  List<Map<String, dynamic>> files = []; // API'den gelen dosyalar
+  List<Map<String, dynamic>> files = [];
   bool isLoadingFiles = true;
 
   final String baseUrl = "http://192.168.2.100:5000";
@@ -56,7 +56,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Dosya açma işlemi
   void openFile(String fileName) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(" $fileName açılıyor...")),
@@ -90,7 +89,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Kullanıcı Bilgileri
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(
@@ -109,7 +107,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontSize: 18, fontWeight: FontWeight.bold)),
                 subtitle: Text("Birim: $unit"),
                 onTap: () {
-                  // Profil ayarlarına yönlendirme
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -119,23 +116,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
-            //  DOSYA LİSTESİ
             const Text(
-              "📂 Dosyalar",
+              "Dosyalar",
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.purple),
             ),
             const SizedBox(height: 10),
-
             Expanded(
               child: isLoadingFiles
                   ? const Center(child: CircularProgressIndicator())
                   : files.isEmpty
                       ? const Center(
-                          child: Text("📁 Henüz yüklenmiş dosya yok.",
+                          child: Text("Henüz yüklenmiş dosya yok.",
                               style:
                                   TextStyle(fontSize: 16, color: Colors.grey)),
                         )
@@ -160,10 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           },
                         ),
             ),
-
             const Divider(),
-
-            //  ÇIKIŞ
             Center(
               child: ElevatedButton.icon(
                 onPressed: logout,
@@ -171,12 +162,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 label: const Text("Çıkış Yap"),
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: Colors.purple,
+                  backgroundColor: Colors.red,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                 ),
               ),
             ),

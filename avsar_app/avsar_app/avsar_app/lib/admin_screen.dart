@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'user_edit_screen.dart';
+import 'user_add_screen.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  const AdminScreen({super.key, required String baseUrl});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -42,41 +42,23 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  void _logout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, "/login");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Admin Paneli",
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        centerTitle: true,
+        title: const Text(
+          "Kullanıcı Yönetimi",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         backgroundColor: Colors.purple,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.exit_to_app, color: Colors.white),
-            onPressed: _logout,
-          ),
-        ],
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "📌 Kullanıcı Yönetimi",
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple),
-            ),
-            const SizedBox(height: 10),
             Expanded(
               child: users.isEmpty
                   ? const Center(child: CircularProgressIndicator())
@@ -94,15 +76,16 @@ class _AdminScreenState extends State<AdminScreen> {
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
                             title: Text(user["name"] ?? "Bilinmeyen Kullanıcı"),
-                            subtitle:
-                                Text("Yetki: ${user["role"] ?? "Bilinmiyor"}"),
+                            subtitle: Text(
+                              "Yetki: ${user["role"] ?? "Bilinmiyor"} | Birim: ${user["unit"] ?? "Bilinmiyor"}",
+                            ),
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => UserEditScreen(
                                     user: user,
-                                    baseUrl: 'http://192.168.2.100:5000',
+                                    baseUrl: baseUrl,
                                   ),
                                 ),
                               ).then((_) => fetchUsers());
@@ -111,6 +94,31 @@ class _AdminScreenState extends State<AdminScreen> {
                         );
                       },
                     ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text("Kullanıcı Ekle",
+                    style: TextStyle(color: Colors.white, fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const UserAddScreen(
+                              baseUrl: 'http://192.168.2.100:5000',
+                            )),
+                  ).then((_) => fetchUsers());
+                },
+              ),
             ),
           ],
         ),

@@ -1,8 +1,8 @@
+import 'package:avsar_app/admin_dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
-import 'admin_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +52,9 @@ class _MyAppState extends State<MyApp> {
       routes: {
         "/login": (context) => const LoginScreen(),
         "/dashboard": (context) => const DashboardScreen(),
-        "/admin": (context) => const AdminScreen(),
+        "/admin": (context) => const AdminDashboardScreen(
+              baseUrl: '',
+            ),
       },
     );
   }

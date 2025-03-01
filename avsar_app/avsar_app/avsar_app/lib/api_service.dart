@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   final String baseUrl = 'http://192.168.2.100:5000';
 
-  /// Kullanıcı giriş yapma
   Future<bool> loginUser(String username, String password) async {
     try {
       final response = await http.post(
@@ -17,10 +16,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // JWT Token'ı kaydet
         SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token',
-            data['token'] ?? ""); // Eğer backend JWT token gönderiyorsa
+        await prefs.setString('token', data['token'] ?? "");
         await prefs.setString('username', data['username'] ?? "Bilinmiyor");
         await prefs.setString('role', data['role'] ?? "User");
 
@@ -35,7 +32,6 @@ class ApiService {
     }
   }
 
-  /// Kullanıcı ekleme
   Future<bool> addUser(String name, String unit, String role, String username,
       String password) async {
     try {
@@ -52,7 +48,6 @@ class ApiService {
       );
 
       if (response.statusCode == 201) {
-        // 201 Created status code
         print("Kullanıcı başarıyla eklendi.");
         return true;
       } else {
@@ -65,7 +60,6 @@ class ApiService {
     }
   }
 
-  /// Kullanıcı güncelleme
   Future<bool> updateUser(
       int userId, String name, String unit, String role) async {
     try {
@@ -88,7 +82,6 @@ class ApiService {
     }
   }
 
-  /// Kullanıcı silme
   Future<bool> deleteUser(int userId) async {
     try {
       final response = await http.delete(
@@ -108,7 +101,6 @@ class ApiService {
     }
   }
 
-  /// Kullanıcıları API'den çek
   Future<List<Map<String, dynamic>>> fetchUsers() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/users/'));

@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'package:avsar_app/admin_dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_screen.dart';
-import 'admin_screen.dart';
 import 'package:http/http.dart' as http;
 
 class LoginScreen extends StatefulWidget {
@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> loginUser() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.2.100:5000/login'), // Sunucu IP adresi
+        Uri.parse('http://192.168.2.100:5000/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _usernameController.text,
@@ -31,20 +31,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         SharedPreferences prefs = await SharedPreferences.getInstance();
-
-        // Kullanıcı bilgilerini kaydet
         await prefs.setString('username', data['username'] ?? "Bilinmiyor");
         await prefs.setString('role', data['role'] ?? "User");
-        await prefs.setString(
-            'unit', data['unit'] ?? "Bilinmiyor"); 
-
-        // API yanıtını ekrana yazdır (Test için)
+        await prefs.setString('unit', data['unit'] ?? "Bilinmiyor");
         print("Gelen API Yanıtı: $data");
 
-        // Kullanıcı rolüne göre yönlendirme
         if (data['role'] == 'Admin') {
-          Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (context) => const AdminScreen()));
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen(
+                      baseUrl: "http://192.168.2.100:5000")));
         } else {
           Navigator.pushReplacement(context,
               MaterialPageRoute(builder: (context) => const DashboardScreen()));

@@ -22,7 +22,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     loadUserData();
   }
 
-  // Kullanıcı verilerini yükle
   Future<void> loadUserData() async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -36,7 +35,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     }
   }
 
-  // Şifre değiştirme fonksiyonu
   void _changePassword() {
     showDialog(
       context: context,
@@ -87,7 +85,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     );
   }
 
-  // API'ye şifre değişikliği isteği gönder
   Future<bool> changePassword(String newPassword) async {
     try {
       final response = await http.put(
@@ -107,45 +104,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       print("API çağrısı başarısız: $e");
       return false;
     }
-  }
-
-  // Dil değişikliğini kaydet
-  void _changeLanguage() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Dil Seçenekleri"),
-          content: DropdownButton<String>(
-            value: selectedLanguage,
-            isExpanded: true,
-            items: ["Türkçe", "İngilizce", "Almanca"].map((lang) {
-              return DropdownMenuItem(value: lang, child: Text(lang));
-            }).toList(),
-            onChanged: (value) async {
-              if (value != null) {
-                SharedPreferences prefs = await SharedPreferences.getInstance();
-                await prefs.setString('language', value);
-                setState(() {
-                  selectedLanguage = value;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text("Dil değiştirildi: $selectedLanguage")),
-                );
-                Navigator.pop(context);
-              }
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("İptal"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _logout() async {
@@ -193,7 +151,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               child: Column(
                 children: [
                   Text(
-                    "👤 Kullanıcı Adı: $username",
+                    "Kullanıcı Adı: $username",
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -203,7 +161,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    "🏢 Birim: $unit",
+                    "Birim: $unit",
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -237,7 +195,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 label: const Text("Çıkış Yap"),
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: Colors.purple,
+                  backgroundColor: Colors.red,
                 ),
               ),
             ),
