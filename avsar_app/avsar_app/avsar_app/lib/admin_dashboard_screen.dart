@@ -13,7 +13,7 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  String username = "";
+  String name = "";
   String unit = "";
   String role = "";
 
@@ -26,7 +26,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      username = prefs.getString('username') ?? "Bilinmiyor";
+      name = prefs.getString('name') ?? "Bilinmiyor";
       unit = prefs.getString('unit') ?? "Bilinmiyor";
       role = prefs.getString('role') ?? "Bilinmiyor";
     });
@@ -63,12 +63,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 leading: CircleAvatar(
                   backgroundColor: Colors.purple,
                   child: Text(
-                    username.isNotEmpty ? username[0].toUpperCase() : "?",
+                    name.isNotEmpty ? name[0].toUpperCase() : "?",
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 title: Text(
-                  username,
+                  name,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

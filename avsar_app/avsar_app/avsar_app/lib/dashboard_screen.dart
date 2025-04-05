@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'profile_settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -12,10 +15,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String username = "Bilinmiyor";
+  String name = "Bilinmiyor";
   String unit = "Bilinmiyor";
+  String username = "";
   List<Map<String, dynamic>> files = [];
   bool isLoadingFiles = true;
+  String currentPath = "";
 
   final String baseUrl = "http://192.168.2.100:5000";
 
@@ -23,43 +28,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     loadUserData();
-    fetchFiles();
   }
 
   Future<void> loadUserData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      username = prefs.getString('username') ?? "Bilinmiyor";
+      name = prefs.getString('name') ?? "Bilinmiyor";
       unit = prefs.getString('unit') ?? "Bilinmiyor";
+      username = prefs.getString('username') ?? "";
     });
+    fetchFiles();
   }
 
-  Future<void> fetchFiles() async {
+  Future<void> fetchFiles([String path = ""]) async {
+    setState(() {
+      isLoadingFiles = true;
+      currentPath = path;
+    });
     try {
-      final response = await http.get(Uri.parse('$baseUrl/files/'));
+      final uri = Uri.parse(
+          "$baseUrl/files/browse?path=${Uri.encodeComponent(path)}&username=$username");
+      final response = await http.get(uri);
       if (response.statusCode == 200) {
         setState(() {
-          files = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+          files = List<Map<String, dynamic>>.from(
+              jsonDecode(utf8.decode(response.bodyBytes)));
           isLoadingFiles = false;
         });
       } else {
-        print("Dosyalar yüklenemedi! Hata kodu: ${response.statusCode}");
-        setState(() {
-          isLoadingFiles = false;
-        });
+        throw Exception("Dosyalar alınamadı");
       }
     } catch (e) {
-      print("Dosyaları çekerken hata oluştu: $e");
-      setState(() {
-        isLoadingFiles = false;
-      });
+      setState(() => isLoadingFiles = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Dosya alınırken hata oluştu: $e")),
+      );
     }
   }
 
-  void openFile(String fileName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(" $fileName açılıyor...")),
-    );
+  void navigateIntoFolder(String folderName) {
+    final newPath =
+        currentPath.isEmpty ? folderName : "$currentPath/$folderName";
+    fetchFiles(newPath);
+  }
+
+  Future<void> downloadAndOpenFile(String relativePath) async {
+    final url = Uri.parse(
+        "$baseUrl/files/download/${Uri.encodeComponent(relativePath)}");
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final bytes = response.bodyBytes;
+        final dir = await getTemporaryDirectory();
+        final fileName = relativePath.split('/').last;
+        final filePath = "${dir.path}/$fileName";
+        final file = File(filePath);
+
+        await file.writeAsBytes(bytes);
+        await OpenFile.open(filePath);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Dosya indirilemedi")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Dosya açma hatası: $e")),
+      );
+    }
   }
 
   void logout() async {
@@ -70,6 +108,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  bool get isInSubFolder => currentPath.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,12 +117,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
         title: const Text(
           "Avsar App",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.purple,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            if (isInSubFolder) {
+              final parent = currentPath.contains("/")
+                  ? currentPath.substring(0, currentPath.lastIndexOf("/"))
+                  : "";
+              fetchFiles(parent);
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -98,11 +148,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 leading: CircleAvatar(
                   backgroundColor: Colors.purple,
                   child: Text(
-                    username.isNotEmpty ? username[0] : "?",
+                    name.isNotEmpty ? name[0].toUpperCase() : "?",
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),
-                title: Text(username,
+                title: Text(name,
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold)),
                 subtitle: Text("Birim: $unit"),
@@ -116,39 +166,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              "Dosyalar",
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.purple),
-            ),
+            if (isInSubFolder)
+              Text("Bulunulan klasör: $currentPath",
+                  style: const TextStyle(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 10),
             Expanded(
               child: isLoadingFiles
                   ? const Center(child: CircularProgressIndicator())
                   : files.isEmpty
                       ? const Center(
-                          child: Text("Henüz yüklenmiş dosya yok.",
+                          child: Text("Hiç dosya veya klasör yok.",
                               style:
                                   TextStyle(fontSize: 16, color: Colors.grey)),
                         )
                       : ListView.builder(
                           itemCount: files.length,
                           itemBuilder: (context, index) {
-                            final fileName =
-                                files[index]["name"] ?? "Bilinmeyen Dosya";
+                            final file = files[index];
+                            final name = file["name"] ?? "-";
+                            final isFile = file["type"] == "file";
+                            final date = file["date"] ?? "";
+
                             return Card(
                               elevation: 2,
+                              margin: const EdgeInsets.symmetric(vertical: 6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: ListTile(
-                                leading: const Icon(Icons.insert_drive_file,
-                                    color: Colors.orange),
-                                title: Text(fileName,
-                                    style: const TextStyle(fontSize: 16)),
-                                onTap: () => openFile(fileName),
+                                title: Text(name),
+                                subtitle:
+                                    Text(isFile ? "📅 $date" : "📁 Klasör"),
+                                trailing: isFile
+                                    ? IconButton(
+                                        icon: const Icon(Icons.download,
+                                            color: Colors.blue),
+                                        onPressed: () {
+                                          final fullPath = currentPath.isEmpty
+                                              ? name
+                                              : "$currentPath/$name";
+                                          downloadAndOpenFile(fullPath);
+                                        },
+                                      )
+                                    : const Icon(Icons.folder,
+                                        color: Colors.orange),
+                                onTap: isFile
+                                    ? null
+                                    : () => navigateIntoFolder(name),
                               ),
                             );
                           },

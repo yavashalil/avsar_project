@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'package:avsar_app/admin_dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'admin_dashboard_screen.dart';
 import 'dashboard_screen.dart';
 import 'package:http/http.dart' as http;
 
@@ -31,29 +31,36 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         SharedPreferences prefs = await SharedPreferences.getInstance();
+
         await prefs.setString('username', data['username'] ?? "Bilinmiyor");
+        await prefs.setString('name', data['name'] ?? "Bilinmiyor");
         await prefs.setString('role', data['role'] ?? "User");
         await prefs.setString('unit', data['unit'] ?? "Bilinmiyor");
+
         print("Gelen API Yanıtı: $data");
 
         if (data['role'] == 'Admin') {
           Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                  builder: (context) => const AdminDashboardScreen(
+                  builder: (context) => AdminDashboardScreen(
                       baseUrl: "http://192.168.2.100:5000")));
         } else {
           Navigator.pushReplacement(context,
               MaterialPageRoute(builder: (context) => const DashboardScreen()));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text(
-                'Giriş başarısız: ${jsonDecode(response.body)['detail'] ?? 'Bilinmeyen hata'}')));
+                'Giriş başarısız: ${jsonDecode(response.body)['detail'] ?? 'Bilinmeyen hata'}'),
+          ),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Bağlantı hatası: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Bağlantı hatası: $e')),
+      );
     }
   }
 
