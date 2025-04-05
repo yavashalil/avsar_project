@@ -1,2 +1,2 @@
 # avsar_project
- Avsar app, şirket içi kullanıcıların birimlerine özel dosyalara erişebildiği, yönetici yetkilendirmesi yapılabilen ve güvenli giriş sistemine sahip bir kurumsal mobil uygulamadır.
+Avsar app is a corporate mobile application that allows internal company users to access unit-specific files, provides administrator authorization capabilities, and features a secure login system.
