@@ -27,7 +27,10 @@ class _UserEditScreenState extends State<UserEditScreen> {
     'Satin Alma',
     'Finans',
     'Bilgi Islem',
-    'Satis'
+    'Satis',
+    'Kalite',
+    'Lojistik',
+    'Sekretarya'
   ];
 
   @override

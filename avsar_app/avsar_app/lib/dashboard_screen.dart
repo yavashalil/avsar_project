@@ -17,6 +17,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   String name = "Bilinmiyor";
   String unit = "Bilinmiyor";
+  String role = "Bilinmiyor";
   String username = "";
   List<Map<String, dynamic>> files = [];
   bool isLoadingFiles = true;
@@ -35,6 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       name = prefs.getString('name') ?? "Bilinmiyor";
       unit = prefs.getString('unit') ?? "Bilinmiyor";
+      role = prefs.getString('role') ?? "Bilinmiyor";
       username = prefs.getString('username') ?? "";
     });
     fetchFiles();
@@ -66,19 +68,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void navigateIntoFolder(String folderName) {
-    final newPath =
-        currentPath.isEmpty ? folderName : "$currentPath/$folderName";
-    fetchFiles(newPath);
+  void navigateIntoFolderOrFile(String name, bool isFile) async {
+    final newPath = currentPath.isEmpty ? name : "$currentPath/$name";
+    if (isFile) {
+      await openFile(newPath);
+    } else {
+      fetchFiles(newPath);
+    }
   }
 
-  Future<void> downloadAndOpenFile(String relativePath) async {
+  Future<void> openFile(String relativePath) async {
     final url = Uri.parse(
         "$baseUrl/files/download/${Uri.encodeComponent(relativePath)}");
 
     try {
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getTemporaryDirectory();
@@ -89,9 +93,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await file.writeAsBytes(bytes);
         await OpenFile.open(filePath);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Dosya indirilemedi")),
-        );
+        throw Exception("Dosya indirilemedi");
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -155,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: Text(name,
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold)),
-                subtitle: Text("Birim: $unit"),
+                subtitle: Text("Birim: $unit | Yetki: $role"),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -166,9 +168,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            if (isInSubFolder)
-              Text("Bulunulan klasör: $currentPath",
-                  style: const TextStyle(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 10),
             Expanded(
               child: isLoadingFiles
@@ -191,28 +190,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               elevation: 2,
                               margin: const EdgeInsets.symmetric(vertical: 6),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: ListTile(
-                                title: Text(name),
-                                subtitle:
-                                    Text(isFile ? "📅 $date" : "📁 Klasör"),
-                                trailing: isFile
-                                    ? IconButton(
-                                        icon: const Icon(Icons.download,
-                                            color: Colors.blue),
-                                        onPressed: () {
-                                          final fullPath = currentPath.isEmpty
-                                              ? name
-                                              : "$currentPath/$name";
-                                          downloadAndOpenFile(fullPath);
-                                        },
-                                      )
-                                    : const Icon(Icons.folder,
-                                        color: Colors.orange),
-                                onTap: isFile
-                                    ? null
-                                    : () => navigateIntoFolder(name),
+                                leading: Icon(
+                                  isFile
+                                      ? Icons.insert_drive_file_rounded
+                                      : Icons.folder_rounded,
+                                  color:
+                                      isFile ? Colors.blueGrey : Colors.orange,
+                                ),
+                                title: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500),
+                                ),
+                                subtitle: isFile && date.isNotEmpty
+                                    ? Text("📅 $date",
+                                        style:
+                                            const TextStyle(color: Colors.grey))
+                                    : null,
+                                onTap: () =>
+                                    navigateIntoFolderOrFile(name, isFile),
                               ),
                             );
                           },

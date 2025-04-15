@@ -78,7 +78,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         await OpenFile.open(filePath);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Dosya indirilemedi")),
+          const SnackBar(content: Text("Dosya indirilemedi")),
         );
       }
     } catch (e) {
@@ -103,10 +103,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         centerTitle: true,
         title: const Text(
           "Dosya Yönetimi",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.purple,
         leading: IconButton(
@@ -126,15 +123,9 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isInSubFolder)
-                    Text("Bulunulan klasör: $currentPath",
-                        style:
-                            const TextStyle(fontSize: 14, color: Colors.grey)),
-                  const SizedBox(height: 10),
                   Expanded(
                     child: files.isEmpty
                         ? const Center(
@@ -151,28 +142,38 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
                                 elevation: 2,
                                 margin: const EdgeInsets.symmetric(vertical: 6),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: ListTile(
-                                  title: Text(name),
-                                  subtitle:
-                                      Text(isFile ? "📅 $date" : "📁 Klasör"),
-                                  trailing: isFile
-                                      ? IconButton(
-                                          icon: const Icon(Icons.download,
-                                              color: Colors.blue),
-                                          onPressed: () {
-                                            final fullPath = currentPath.isEmpty
-                                                ? name
-                                                : "$currentPath/$name";
-                                            downloadAndOpenFile(fullPath);
-                                          },
-                                        )
-                                      : const Icon(Icons.folder,
-                                          color: Colors.orange),
-                                  onTap: isFile
-                                      ? null
-                                      : () => navigateIntoFolder(name),
+                                  leading: Icon(
+                                    isFile
+                                        ? Icons.insert_drive_file_rounded
+                                        : Icons.folder_rounded,
+                                    color: isFile
+                                        ? Colors.blueGrey
+                                        : Colors.orange,
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        overflow: TextOverflow.ellipsis),
+                                  ),
+                                  subtitle: isFile && date.isNotEmpty
+                                      ? Text("📅 $date",
+                                          style: const TextStyle(
+                                              color: Colors.grey))
+                                      : null,
+                                  onTap: () {
+                                    final fullPath = currentPath.isEmpty
+                                        ? name
+                                        : "$currentPath/$name";
+                                    if (isFile) {
+                                      downloadAndOpenFile(fullPath);
+                                    } else {
+                                      navigateIntoFolder(name);
+                                    }
+                                  },
                                 ),
                               );
                             },

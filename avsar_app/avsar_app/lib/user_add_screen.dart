@@ -25,7 +25,10 @@ class _UserAddScreenState extends State<UserAddScreen> {
     'Satin Alma',
     'Finans',
     'Bilgi Islem',
-    'Satis'
+    'Satis',
+    'Kalite',
+    'Lojistik',
+    'Sekretarya'
   ];
 
   Future<void> _addUser() async {

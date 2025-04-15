@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncpg
@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from urllib.parse import unquote
 from fastapi.responses import FileResponse
+import unicodedata
 
 app = FastAPI()
 
@@ -26,6 +27,9 @@ class User(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+def normalize(text: str):
+    return unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode().lower().replace(" ", "")
 
 @app.on_event("startup")
 async def startup():
@@ -120,12 +124,24 @@ async def delete_user(username: str):
     return {"message": f"Kullanıcı '{username}' başarıyla silindi"}
 
 BIRIM_KLASOR_IZINLERI = {
-    "Muhasebe": ["001-ŞUAYP DEMİREL MADENSUYU A.Ş (MUHASEBE)"],
+    "Muhasebe": ["001-ŞUAYP DEMİREL MADENSUYU A.Ş (MUHASEBE)", "AFAD BÖLGE KAPAK YAZISI.docx", "RESMİ BELGELER"],
     "Satis": ["BİM PALET GÜNCEL", "ESKİ SATIŞ", "PAZARLAMA", "İHRACAT 2022", "İHRACAT ÜRÜN FOTOLARI"],
-    "Finans": ["FİNANS"],
-    "Satin Alma": ["SATINALMA"],
-    "Bilgi Islem": ["BILGI ISLEM"]
+    "Finans": ["FİNANS", "M3145"],
+    "Satin Alma": ["SATINALMA", "Akis Kart İzleme Aracı.lnk", "KatilimciBilgileri (17).xlsx", "REKLAM-GÖRSEL"],
+    "Bilgi Islem": ["BILGI ISLEM", "Thumbs.db"],
+    "Kalite": ["KALİTE", "ÜRETİM SAVUNMA TUTANAK"],
+    "Lojistik": ["LOJISTIK"],
+    "Pazarlama": ["PAZARLAMA"],
+    "Sekretarya": ["SEKRETERYA"]
 }
+
+def get_izinli_klasorler(unit: str, role: str):
+    if role.lower() == "admin":
+        return None
+    for key, klasorler in BIRIM_KLASOR_IZINLERI.items():
+        if normalize(key) == normalize(unit):
+            return klasorler
+    return []
 
 @app.get("/files/")
 async def list_files(username: str):
@@ -135,9 +151,7 @@ async def list_files(username: str):
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
-    unit = user["unit"].strip().lower()
-    role = user["role"].strip().lower()
-    izinli_klasorler = None if "admin" in role else BIRIM_KLASOR_IZINLERI.get(unit, [])
+    izinli_klasorler = get_izinli_klasorler(user["unit"], user["role"])
 
     try:
         items = []
@@ -145,13 +159,12 @@ async def list_files(username: str):
             for entry in entries:
                 if izinli_klasorler is not None and entry.name not in izinli_klasorler:
                     continue
+                if not entry.is_dir():
+                    continue
                 item = {
                     "name": entry.name,
-                    "type": "file" if entry.is_file() else "directory",
+                    "type": "directory",
                 }
-                if entry.is_file():
-                    created = datetime.fromtimestamp(entry.stat().st_ctime).strftime("%d.%m.%Y")
-                    item["date"] = created
                 items.append(item)
         return items
     except Exception as e:
@@ -165,9 +178,7 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
-    unit = user["unit"].strip().lower()
-    role = user["role"].strip().lower()
-    izinli_klasorler = None if "admin" in role else BIRIM_KLASOR_IZINLERI.get(unit, [])
+    izinli_klasorler = get_izinli_klasorler(user["unit"], user["role"])
 
     decoded_path = unquote(path, encoding="utf-8")
     full_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded_path))
@@ -186,6 +197,8 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
         items = []
         with os.scandir(full_path) as entries:
             for entry in entries:
+                if izinli_klasorler is not None and decoded_path == "" and entry.name not in izinli_klasorler:
+                    continue
                 item = {
                     "name": entry.name,
                     "type": "file" if entry.is_file() else "directory",
@@ -212,4 +225,6 @@ async def download_file(file_path: str):
     return FileResponse(path=absolute_path, filename=os.path.basename(absolute_path))
 
 
-# python -m uvicorn test:app --host 192.168.2.100 --port 5000 --reload
+
+
+# python -m uvicorn test:app --host 192.168.2.100 --port 5000 --reload 
