@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1024043793605",
+    "project_id": "avsarapp-8c7b4",
+    "storage_bucket": "avsarapp-8c7b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1024043793605:android:8ccffa254cba44504644ac",
+        "android_client_info": {
+          "package_name": "com.example.avsar_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdemRc_SpQ8hkH0PJGMUoB5hUK4OXgyn8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

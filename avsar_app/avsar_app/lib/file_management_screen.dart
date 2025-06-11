@@ -8,7 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class FileManagementScreen extends StatefulWidget {
   final String baseUrl;
-  const FileManagementScreen({super.key, required this.baseUrl});
+  final String? initialPath; // 🔹 Bildirimden gelen yol
+
+  const FileManagementScreen({
+    super.key,
+    required this.baseUrl,
+    this.initialPath,
+  });
 
   @override
   _FileManagementScreenState createState() => _FileManagementScreenState();
@@ -29,7 +35,13 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
   Future<void> _loadUserAndFetch() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     username = prefs.getString('username');
-    fetchFiles();
+
+    if (widget.initialPath != null) {
+      await downloadAndOpenFile(widget.initialPath!);
+      Navigator.pop(context); // İşlem tamamlanınca ekranı kapat
+    } else {
+      fetchFiles();
+    }
   }
 
   Future<void> fetchFiles([String path = ""]) async {
@@ -39,10 +51,12 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
       isLoading = true;
       currentPath = path;
     });
+
     try {
       final uri = Uri.parse(
           "${widget.baseUrl}/files/browse?path=${Uri.encodeComponent(path)}&username=$username");
       final response = await http.get(uri);
+
       if (response.statusCode == 200) {
         setState(() {
           files = List<Map<String, dynamic>>.from(

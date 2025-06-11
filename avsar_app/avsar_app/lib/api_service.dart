@@ -17,9 +17,10 @@ class ApiService {
         final data = jsonDecode(response.body);
 
         SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', data['token'] ?? "");
         await prefs.setString('username', data['username'] ?? "Bilinmiyor");
         await prefs.setString('role', data['role'] ?? "User");
+        await prefs.setString('email', data['email'] ?? "");
+        await prefs.setString('unit', data['unit'] ?? "");
 
         return true;
       } else {

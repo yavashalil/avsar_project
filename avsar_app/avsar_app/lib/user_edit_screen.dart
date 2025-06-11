@@ -17,6 +17,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
+  late TextEditingController _emailController; // ✨ eklendi
   late String _role;
   late String _unit;
 
@@ -39,6 +40,8 @@ class _UserEditScreenState extends State<UserEditScreen> {
     _nameController = TextEditingController(text: widget.user['name']);
     _usernameController = TextEditingController(text: widget.user['username']);
     _passwordController = TextEditingController();
+    _emailController =
+        TextEditingController(text: widget.user['email'] ?? ''); // ✨
     _role = widget.user['role'] ?? 'User';
     _unit = _units.contains(widget.user['unit'])
         ? widget.user['unit']
@@ -56,6 +59,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
             'name': _nameController.text,
             'unit': _unit,
             'role': _role,
+            'email': _emailController.text, // ✨
             'password': _passwordController.text.isNotEmpty
                 ? _passwordController.text
                 : null,
@@ -139,13 +143,12 @@ class _UserEditScreenState extends State<UserEditScreen> {
         backgroundColor: Colors.purple,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: SingleChildScrollView(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(14.0),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
               children: [
                 TextFormField(
                   controller: _nameController,
@@ -154,7 +157,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10))),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _usernameController,
                   decoration: InputDecoration(
@@ -162,7 +165,21 @@ class _UserEditScreenState extends State<UserEditScreen> {
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10))),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: InputDecoration(
+                      labelText: 'E-Posta',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10))),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Lütfen e-posta giriniz';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
                   decoration: InputDecoration(
@@ -171,7 +188,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
                           borderRadius: BorderRadius.circular(10))),
                   obscureText: true,
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _unit,
                   decoration: InputDecoration(
@@ -184,7 +201,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
                       .toList(),
                   onChanged: (value) => setState(() => _unit = value!),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _role,
                   decoration: InputDecoration(
@@ -197,38 +214,44 @@ class _UserEditScreenState extends State<UserEditScreen> {
                       .toList(),
                   onChanged: (value) => setState(() => _role = value!),
                 ),
-                SizedBox(height: 180),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _updateUser,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10))),
-                        child: Text('Güncelle',
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _confirmDeleteUser,
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10))),
-                        child: Text('Kullanıcıyı Sil',
-                            style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 80), // boşluk bırak ekran altına
               ],
             ),
           ),
+        ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _updateUser,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Güncelle',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _confirmDeleteUser,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Kullanıcıyı Sil',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
         ),
       ),
     );

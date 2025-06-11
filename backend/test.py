@@ -22,12 +22,13 @@ class User(BaseModel):
     unit: str
     role: str
     username: str
+    email: str        
     password: Optional[str] = None
 
 class LoginRequest(BaseModel):
     username: str
     password: str
-
+ 
 def normalize(text: str):
     return unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode().lower().replace(" ", "")
 
@@ -41,6 +42,7 @@ async def startup():
             unit TEXT NOT NULL,
             role TEXT NOT NULL,
             username TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
             password TEXT NOT NULL
         )
     """)
@@ -49,7 +51,7 @@ async def startup():
 @app.get("/users/", response_model=List[User])
 async def get_users():
     conn = await get_db()
-    rows = await conn.fetch("SELECT name, unit, role, username, password FROM users")
+    rows = await conn.fetch("SELECT name, unit, role, username, email, password FROM users")
     await conn.close()
     return [
         {
@@ -57,9 +59,10 @@ async def get_users():
             "unit": row["unit"],
             "role": row["role"],
             "username": row["username"],
+            "email": row["email"],
             "password": row["password"]
         }
-        for row in rows
+        for row in rows 
     ]
 
 @app.post("/users/")
@@ -68,8 +71,8 @@ async def add_user(user: User):
     hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     try:
         await conn.execute(
-            "INSERT INTO users (name, unit, role, username, password) VALUES ($1, $2, $3, $4, $5)",
-            user.name, user.unit, user.role, user.username, hashed_password
+            "INSERT INTO users (name, unit, role, username, email, password) VALUES ($1, $2, $3, $4, $5, $6)",
+            user.name, user.unit, user.role, user.username, user.email, hashed_password
         )
         await conn.close()
     except asyncpg.UniqueViolationError:
@@ -88,8 +91,8 @@ async def update_user(username: str, user: User):
     if user.password:
         hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     await conn.execute(
-        "UPDATE users SET name=$1, unit=$2, role=$3, password=$4 WHERE username=$5",
-        user.name, user.unit, user.role, hashed_password, username
+        "UPDATE users SET name=$1, unit=$2, role=$3, email=$4, password=$5 WHERE username=$6",
+        user.name, user.unit, user.role, user.email, hashed_password, username
     )
     await conn.close()
     return {"message": "Kullanıcı başarıyla güncellendi"}
@@ -97,11 +100,11 @@ async def update_user(username: str, user: User):
 @app.post("/login")
 async def login(user: LoginRequest):
     conn = await get_db()
-    result = await conn.fetchrow("SELECT name, password, role, unit FROM users WHERE username = $1", user.username)
+    result = await conn.fetchrow("SELECT name, password, role, unit, email FROM users WHERE username = $1", user.username)
     if result is None:
         await conn.close()
         raise HTTPException(status_code=401, detail="Geçersiz kullanıcı adı veya şifre")
-    stored_name, stored_password, role, unit = result["name"], result["password"], result["role"], result["unit"]
+    stored_name, stored_password, role, unit, email = result["name"], result["password"], result["role"], result["unit"], result["email"]
     if not bcrypt.checkpw(user.password.encode("utf-8"), stored_password.encode("utf-8")):
         await conn.close()
         raise HTTPException(status_code=401, detail="Geçersiz kullanıcı adı veya şifre")
@@ -111,7 +114,8 @@ async def login(user: LoginRequest):
         "username": user.username,
         "name": stored_name,
         "role": role,
-        "unit": unit
+        "unit": unit,
+        "email": email
     }
 
 @app.delete("/users/{username}")
@@ -223,8 +227,5 @@ async def download_file(file_path: str):
         raise HTTPException(status_code=403, detail="Erişim reddedildi")
 
     return FileResponse(path=absolute_path, filename=os.path.basename(absolute_path))
-
-
-
 
 # python -m uvicorn test:app --host 192.168.2.100 --port 5000 --reload 
