@@ -16,6 +16,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String name = "";
   String unit = "";
   String role = "";
+  String username = "";
 
   @override
   void initState() {
@@ -29,6 +30,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       name = prefs.getString('name') ?? "Bilinmiyor";
       unit = prefs.getString('unit') ?? "Bilinmiyor";
       role = prefs.getString('role') ?? "Bilinmiyor";
+      username = prefs.getString('username') ?? "default_user";
     });
   }
 
@@ -123,6 +125,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     MaterialPageRoute(
                       builder: (context) => FileManagementScreen(
                         baseUrl: widget.baseUrl,
+                        username: username, // ✅ GEREKLİ PARAMETRE EKLENDİ
                       ),
                     ),
                   );

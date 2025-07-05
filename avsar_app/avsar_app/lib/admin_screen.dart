@@ -13,7 +13,7 @@ class AdminScreen extends StatefulWidget {
 
 class _AdminScreenState extends State<AdminScreen> {
   List<Map<String, dynamic>> users = [];
-  final String baseUrl = "http://192.168.2.100:5000";
+  final String baseUrl = "http://10.0.2.2:5000";
 
   @override
   void initState() {
@@ -114,7 +114,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     context,
                     MaterialPageRoute(
                         builder: (context) => const UserAddScreen(
-                              baseUrl: 'http://192.168.2.100:5000',
+                              baseUrl: 'http://10.0.2.2:5000',
                             )),
                   ).then((_) => fetchUsers());
                 },

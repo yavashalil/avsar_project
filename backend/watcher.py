@@ -10,13 +10,14 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 from threading import Timer
 from collections import defaultdict
+from urllib.parse import quote
 
 # -------------------- AYARLAR --------------------
 DATABASE_URL = "postgresql://postgres:Halil0648.@localhost:5432/avsar_db"
 IZLENECEK_KLASORLER = [
     r"\\192.168.2.7\data\ORTAK\KALİTE\4. FORMLAR",
     r"\\192.168.2.7\data\ORTAK\KALİTE\10. TALİMATLAR",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\11. PROSEDÜRLER",
+    r"\\192.168.2.7\data\ORTAK\KALİTE\11. PROSEDÜrLER",
     r"\\192.168.2.7\data\ORTAK\KALİTE\3. PLANLAR",
     r"\\192.168.2.7\data\ORTAK\KALİTE\2.TEHLİKE ANALİZLERİ",
     r"\\192.168.2.7\data\ORTAK\KALİTE\5. HAMMADDE-ÜRÜN TANIMLARI",
@@ -50,7 +51,6 @@ if not firebase_admin._apps:
 conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 conn.autocommit = True
 
-# -------------------- VERİTABANI --------------------
 def db_insert_log(zaman, event_type, filename, script_user, owner):
     with conn.cursor() as cur:
         cur.execute(
@@ -61,12 +61,14 @@ def db_insert_log(zaman, event_type, filename, script_user, owner):
             (zaman, event_type, filename, script_user, owner)
         )
 
-# -------------------- FCM PUSH --------------------
-def send_fcm_notification(zaman, event_type, filename, script_user, owner):
+def send_fcm_notification(zaman, event_type, full_path, filename, script_user, owner):
     try:
+        relative_path = os.path.relpath(full_path, r"\\192.168.2.7\data").replace("\\", "/")
+        encoded_path = quote(relative_path, safe="/()~$-_")
+
         title = "📁 Dosya Takibi - QDMS"
         body = (
-            f"📝 *{filename}* dosyasında **{event_type.lower()}** işlemi yapıldı.\n\n"
+            f"📜 {filename} dosyasında {event_type.lower()} işlemi yapıldı.\n\n"
             f"👤 Kullanıcı  : {script_user}\n"
             f"🕒 Zaman      : {zaman.strftime('%d.%m.%Y %H:%M:%S')}"
         )
@@ -78,14 +80,14 @@ def send_fcm_notification(zaman, event_type, filename, script_user, owner):
                 body=body,
             ),
             data={
-                "filepath": filename,  # Veya tam yol: path
+                "fileurl": encoded_path,  # ← ENCODE edilmiş hali
                 "event_type": event_type,
             },
             android=messaging.AndroidConfig(
                 priority="high",
                 notification=messaging.AndroidNotification(
                     sound="default",
-                    color="#00796B",  # yeşilimsi renk
+                    color="#00796B",
                 )
             ),
             apns=messaging.APNSConfig(
@@ -100,13 +102,12 @@ def send_fcm_notification(zaman, event_type, filename, script_user, owner):
         print(f"⚠️ Bildirim gönderme hatası: {e}")
 
 
-# -------------------- DOSYA İZLEYİCİ --------------------
 
 class ExcelWatcherHandler(FileSystemEventHandler):
     def __init__(self):
         super().__init__()
         self.bildirim_kuyrugu = defaultdict(lambda: None)
-        self.bildirim_suresi = 15  # saniye
+        self.bildirim_suresi = 15
 
     def log_change(self, event_type: str, path: str):
         if not any(path.startswith(klasor) for klasor in IZLENECEK_KLASORLER):
@@ -120,12 +121,10 @@ class ExcelWatcherHandler(FileSystemEventHandler):
         script_user = getpass.getuser()
         owner = "N/A"
 
-        # Debounce kontrolü
         if self.bildirim_kuyrugu[filename] is not None:
             print(f"⏳ {filename} için 15 saniye bekleniyor, bildirim atlanıyor.")
             return
 
-        # Kuyruğa ekle ve zamanlayıcı başlat
         self.bildirim_kuyrugu[filename] = Timer(
             self.bildirim_suresi,
             self.gonder_bildirim,
@@ -149,10 +148,9 @@ class ExcelWatcherHandler(FileSystemEventHandler):
         except Exception as e:
             print("⚠️ Veritabanına yazılamadı:", e)
 
-        send_fcm_notification(zaman, event_type, filename, script_user, owner)
+        send_fcm_notification(zaman, event_type, path, filename, script_user, owner)
         print(satir.strip())
 
-        # Kuyruktan çıkar
         self.bildirim_kuyrugu[filename] = None
 
     def on_modified(self, event):
@@ -167,8 +165,6 @@ class ExcelWatcherHandler(FileSystemEventHandler):
         if not event.is_directory:
             self.log_change("SİLİNDİ", event.src_path)
 
-
-# -------------------- ANA FONKSİYON --------------------
 if __name__ == "__main__":
     print("📂 İzlenen klasörler:")
     for k in IZLENECEK_KLASORLER:

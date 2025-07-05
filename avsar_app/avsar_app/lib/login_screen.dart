@@ -20,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> loginUser() async {
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.2.100:5000/login'),
+        Uri.parse('http://10.0.2.2:5000/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': _usernameController.text,
@@ -43,8 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                  builder: (context) => AdminDashboardScreen(
-                      baseUrl: "http://192.168.2.100:5000")));
+                  builder: (context) =>
+                      AdminDashboardScreen(baseUrl: "http://10.0.2.2:5000")));
         } else {
           Navigator.pushReplacement(context,
               MaterialPageRoute(builder: (context) => const DashboardScreen()));

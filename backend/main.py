@@ -6,8 +6,11 @@ import bcrypt
 import os
 from datetime import datetime
 from urllib.parse import unquote
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import unicodedata
+import mimetypes
+from fastapi.responses import StreamingResponse
+import urllib
 
 app = FastAPI()
 
@@ -96,7 +99,7 @@ async def update_user(username: str, user: User):
     )
     await conn.close()
     return {"message": "Kullanıcı başarıyla güncellendi"}
-
+ 
 @app.post("/login")
 async def login(user: LoginRequest):
     conn = await get_db()
@@ -127,52 +130,37 @@ async def delete_user(username: str):
         raise HTTPException(status_code=404, detail=f"Kullanıcı '{username}' bulunamadı.")
     return {"message": f"Kullanıcı '{username}' başarıyla silindi"}
 
-BIRIM_KLASOR_IZINLERI = {
-    "Muhasebe": ["001-ŞUAYP DEMİREL MADENSUYU A.Ş (MUHASEBE)", "AFAD BÖLGE KAPAK YAZISI.docx", "RESMİ BELGELER"],
-    "Satis": ["BİM PALET GÜNCEL", "ESKİ SATIŞ", "PAZARLAMA", "İHRACAT 2022", "İHRACAT ÜRÜN FOTOLARI"],
-    "Finans": ["FİNANS", "M3145"],
-    "Satin Alma": ["SATINALMA", "Akis Kart İzleme Aracı.lnk", "KatilimciBilgileri (17).xlsx", "REKLAM-GÖRSEL"],
-    "Bilgi Islem": ["BILGI ISLEM", "Thumbs.db"],
-    "Kalite": ["KALİTE", "ÜRETİM SAVUNMA TUTANAK"],
-    "Lojistik": ["LOJISTIK"],
-    "Pazarlama": ["PAZARLAMA"],
-    "Sekretarya": ["SEKRETERYA"]
-}
+@app.get("/files/open/{file_path:path}")
+async def open_file(file_path: str):
+    decoded = unquote(file_path, encoding="utf-8")
+    print("📂 İstek geldi:", file_path)
+    print("🧹 Çözülmüş path:", decoded)
+    absolute_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded))
 
-def get_izinli_klasorler(unit: str, role: str):
-    if role.lower() == "admin":
-        return None
-    for key, klasorler in BIRIM_KLASOR_IZINLERI.items():
-        if normalize(key) == normalize(unit):
-            return klasorler
-    return []
+    if not os.path.exists(absolute_path) or not os.path.isfile(absolute_path):
+        raise HTTPException(status_code=404, detail="Dosya bulunamadı")
 
-@app.get("/files/")
-async def list_files(username: str):
-    conn = await get_db()
-    user = await conn.fetchrow("SELECT unit, role FROM users WHERE username=$1", username)
-    await conn.close()
-    if not user:
-        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+    if not absolute_path.startswith(os.path.abspath(ORTAK_DOSYA_YOLU)):
+        raise HTTPException(status_code=403, detail="Erişim reddedildi")
 
-    izinli_klasorler = get_izinli_klasorler(user["unit"], user["role"])
+    mime_type, _ = mimetypes.guess_type(absolute_path)
+    filename = os.path.basename(absolute_path)
 
     try:
-        items = []
-        with os.scandir(ORTAK_DOSYA_YOLU) as entries:
-            for entry in entries:
-                if izinli_klasorler is not None and entry.name not in izinli_klasorler:
-                    continue
-                if not entry.is_dir():
-                    continue
-                item = {
-                    "name": entry.name,
-                    "type": "directory",
-                }
-                items.append(item)
-        return items
+        file = open(absolute_path, "rb")
+        encoded_filename = urllib.parse.quote(filename)
+
+        return StreamingResponse(
+            file,
+            media_type=mime_type or "application/pdf",
+            headers={
+                "Content-Disposition": f"inline; filename*=UTF-8''{encoded_filename}",
+                "Content-Type": mime_type or "application/pdf",
+                "X-Content-Type-Options": "nosniff"
+            }
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Hata: {e}")
+        raise HTTPException(status_code=500, detail=f"Sunucu hatası: {e}")
 
 @app.get("/files/browse")
 async def browse_folder(path: Optional[str] = Query(default=""), username: str = Query(...)):
@@ -182,17 +170,13 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
-    izinli_klasorler = get_izinli_klasorler(user["unit"], user["role"])
-
-    decoded_path = unquote(path, encoding="utf-8")
+    decoded_path = unquote(path)
     full_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded_path))
+    print("🔍 İstenen path:", decoded_path)
+    print("🗂️ Tam sistem path:", full_path)
 
     if not full_path.startswith(os.path.abspath(ORTAK_DOSYA_YOLU)):
-        raise HTTPException(status_code=403, detail="Erişim izniniz yok.")
-
-    ilk_klasor = decoded_path.split("/")[0] if decoded_path else ""
-    if izinli_klasorler is not None and ilk_klasor and ilk_klasor not in izinli_klasorler:
-        raise HTTPException(status_code=403, detail="Bu klasöre erişim izniniz yok")
+        raise HTTPException(status_code=403, detail="Geçersiz erişim")
 
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Klasör bulunamadı")
@@ -201,8 +185,6 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
         items = []
         with os.scandir(full_path) as entries:
             for entry in entries:
-                if izinli_klasorler is not None and decoded_path == "" and entry.name not in izinli_klasorler:
-                    continue
                 item = {
                     "name": entry.name,
                     "type": "file" if entry.is_file() else "directory",
@@ -214,18 +196,3 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
         return items
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sunucu hatası: {e}")
-
-@app.get("/files/download/{file_path:path}")
-async def download_file(file_path: str):
-    decoded = unquote(file_path, encoding="utf-8")
-    absolute_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded))
-
-    if not os.path.exists(absolute_path) or not os.path.isfile(absolute_path):
-        raise HTTPException(status_code=404, detail="Dosya bulunamadı")
-
-    if not absolute_path.startswith(os.path.abspath(ORTAK_DOSYA_YOLU)):
-        raise HTTPException(status_code=403, detail="Erişim reddedildi")
-
-    return FileResponse(path=absolute_path, filename=os.path.basename(absolute_path))
-
-# python -m uvicorn test:app --host 192.168.2.100 --port 5000 --reload 

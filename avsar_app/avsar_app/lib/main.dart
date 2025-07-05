@@ -8,8 +8,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+
+String? globalUsername;
 
 Future<void> _initializeLocalNotifications() async {
   const AndroidInitializationSettings androidSettings =
@@ -18,7 +22,23 @@ Future<void> _initializeLocalNotifications() async {
   final InitializationSettings initSettings =
       InitializationSettings(android: androidSettings);
 
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
+  await flutterLocalNotificationsPlugin.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: (response) {
+      final payload = response.payload;
+      if (payload != null && payload.isNotEmpty && globalUsername != null) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          navigatorKey.currentState?.push(MaterialPageRoute(
+            builder: (_) => FileManagementScreen(
+              baseUrl: "http://10.0.2.2:5000",
+              initialPath: payload,
+              username: globalUsername!,
+            ),
+          ));
+        });
+      }
+    },
+  );
 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'default_channel',
@@ -36,6 +56,10 @@ Future<void> _initializeLocalNotifications() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  final prefs = await SharedPreferences.getInstance();
+  globalUsername = prefs.getString("username");
+
   await _initializeLocalNotifications();
   runApp(const MyApp());
 }
@@ -52,8 +76,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    _setupInitialLogic();
-    _setupFCMListeners();
+    _setupInitialLogic().then((_) {
+      _setupFCMListeners();
+    });
   }
 
   Future<void> _setupInitialLogic() async {
@@ -61,28 +86,23 @@ class _MyAppState extends State<MyApp> {
       final prefs = await SharedPreferences.getInstance();
       final fcm = FirebaseMessaging.instance;
 
-      // 🔐 Bildirim izin durumu
-      final settings = await fcm.requestPermission(
+      var settings = await fcm.requestPermission(
         alert: true,
-        announcement: false,
         badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
         sound: true,
       );
       print("📢 Bildirim izni durumu: ${settings.authorizationStatus}");
 
-      // 🔑 FCM token alma
       final token = await fcm.getToken();
       if (token != null) {
-        print("🔑 FCM TOKEN: $token");
+        debugPrint("🔑 FCM TOKEN: $token");
         await prefs.setString("fcmToken", token);
       }
 
-      // Giriş kontrolü
       final username = prefs.getString('username') ?? "Bilinmiyor";
       final role = prefs.getString('role') ?? "User";
+
+      globalUsername = username;
 
       if (username == "Bilinmiyor" || role == "User") {
         _initialRoute = "/login";
@@ -94,7 +114,7 @@ class _MyAppState extends State<MyApp> {
 
       setState(() {});
     } catch (e) {
-      print("❌ Hata oluştu: $e");
+      debugPrint("❌ Hata oluştu: $e");
       setState(() => _initialRoute = "/login");
     }
   }
@@ -107,24 +127,38 @@ class _MyAppState extends State<MyApp> {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      final filepath = message.data['filepath'];
-      final baseUrl = "http://192.168.2.7:5000";
+      _handleMessage(message);
+    });
 
-      if (filepath != null && filepath.isNotEmpty) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => FileManagementScreen(
-              baseUrl: baseUrl,
-              initialPath: filepath,
-            ),
-          ),
-        );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final message = await FirebaseMessaging.instance.getInitialMessage();
+      if (message != null) {
+        _handleMessage(message);
       }
     });
   }
 
+  void _handleMessage(RemoteMessage message) {
+    final relativePath = message.data['fileurl'];
+    if (relativePath != null &&
+        relativePath.isNotEmpty &&
+        globalUsername != null) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        navigatorKey.currentState?.push(MaterialPageRoute(
+          builder: (_) => FileManagementScreen(
+            baseUrl: "http://10.0.2.2:5000",
+            initialPath: relativePath,
+            username: globalUsername!,
+          ),
+        ));
+      });
+    }
+  }
+
   void _showLocalNotification(RemoteMessage message) {
     final notification = message.notification;
+    final payload = message.data['fileurl'] ?? "";
+
     if (notification == null) return;
 
     const androidDetails = AndroidNotificationDetails(
@@ -143,6 +177,7 @@ class _MyAppState extends State<MyApp> {
       notification.title,
       notification.body,
       generalNotificationDetails,
+      payload: payload,
     );
   }
 
@@ -150,6 +185,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       initialRoute: _initialRoute,
       routes: {
         "/login": (context) => const LoginScreen(),

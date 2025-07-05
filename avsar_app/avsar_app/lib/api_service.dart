@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = 'http://192.168.2.100:5000';
+  final String baseUrl = 'http://10.0.2.2:5000';
 
   Future<bool> loginUser(String username, String password) async {
     try {

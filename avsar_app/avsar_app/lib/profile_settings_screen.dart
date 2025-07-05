@@ -14,7 +14,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   String username = "Bilinmiyor";
   String unit = "Bilinmiyor";
   String selectedLanguage = "Türkçe";
-  final String baseUrl = "http://192.168.2.100:5000";
+  final String baseUrl = "http://10.0.2.2:5000";
 
   @override
   void initState() {
