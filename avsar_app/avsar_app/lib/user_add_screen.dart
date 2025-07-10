@@ -15,22 +15,20 @@ class _UserAddScreenState extends State<UserAddScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _emailController =
-      TextEditingController(); // ✨ eklendi
+  final TextEditingController _emailController = TextEditingController();
   String _selectedUnit = 'Muhasebe';
   String _selectedRole = 'User';
 
   final List<String> units = [
     'Muhasebe',
-    'Pazarlama',
-    'IK',
     'Satin Alma',
     'Finans',
     'Bilgi Islem',
     'Satis',
     'Kalite',
     'Lojistik',
-    'Sekretarya'
+    'Genel Mudur',
+    'Fabrika Muduru'
   ];
 
   Future<void> _addUser() async {

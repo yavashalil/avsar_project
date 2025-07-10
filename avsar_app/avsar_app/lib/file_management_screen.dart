@@ -42,24 +42,23 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
     setState(() => isLoading = true);
 
     if (widget.initialPath != null && widget.initialPath!.isNotEmpty) {
-      print("📥 Bildirimden gelen dosya açılıyor: ${widget.initialPath!}");
+      print("Bildirimden gelen dosya açılıyor: ${widget.initialPath!}");
 
       String sanitizedPath = Uri.decodeFull(widget.initialPath!);
-      print("🧪 Path temizlenmeden: $sanitizedPath");
+      print("Path temizlenmeden: $sanitizedPath");
 
-      // ORTAK/ prefix'ini temizle
       if (sanitizedPath.startsWith("ORTAK/")) {
         sanitizedPath = sanitizedPath.replaceFirst("ORTAK/", "");
-        print("🧼 ORTAK/ kaldırıldı: $sanitizedPath");
+        print("ORTAK/ kaldırıldı: $sanitizedPath");
       }
 
       try {
         await openFileFromServer(sanitizedPath);
       } catch (e) {
-        print("❌ Dosya açma hatası: $e");
+        print("Dosya açma hatası: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("⚠️ Dosya açılamadı: $e")),
+            SnackBar(content: Text("Dosya açılamadı: $e")),
           );
         }
       }
@@ -68,7 +67,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
           ? sanitizedPath.substring(0, sanitizedPath.lastIndexOf("/"))
           : "";
 
-      print("🧽 Klasör listelenecek path: $folderPath");
+      print("Klasör listelenecek path: $folderPath");
       await fetchFiles(folderPath);
     } else {
       await fetchFiles();
@@ -82,7 +81,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
     username = prefs.getString('username') ?? widget.username;
 
     print(
-        "🌐 fetchFiles çağrısı: ${widget.baseUrl}/files/browse?path=${Uri.encodeFull(path)}&username=$username");
+        "fetchFiles çağrısı: ${widget.baseUrl}/files/browse?path=${Uri.encodeFull(path)}&username=$username");
 
     setState(() {
       isLoading = true;
@@ -100,7 +99,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         final List<Map<String, dynamic>> fetchedFiles =
             List<Map<String, dynamic>>.from(decoded);
 
-        print("✅ fetchFiles tamamlandı. ${fetchedFiles.length} dosya bulundu");
+        print("fetchFiles tamamlandı. ${fetchedFiles.length} dosya bulundu");
 
         if (mounted) {
           setState(() {
@@ -112,11 +111,11 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
         throw Exception("HTTP ${response.statusCode}: Dosya alınamadı");
       }
     } catch (e) {
-      print("❌ Dosya alma hatası: $e");
+      print("Dosya alma hatası: $e");
       if (mounted) {
         setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("⚠️ Dosya alınırken hata: $e")),
+          SnackBar(content: Text("Dosya alınırken hata: $e")),
         );
       }
     }
@@ -125,16 +124,16 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
   Future<void> openFileFromServer(String relativePath) async {
     try {
       if (relativePath.contains('%7E%24') || relativePath.contains('~\$')) {
-        print("⛔ Geçici dosya tespit edildi, açma atlandı.");
+        print("Geçici dosya tespit edildi, açma atlandı.");
         return;
       }
 
       final encodedPath = Uri.encodeFull(relativePath);
       final url = "${widget.baseUrl}/files/open/$encodedPath";
-      print("🔗 Tam URL (encoded): $url");
+      print("Tam URL (encoded): $url");
 
       final response = await http.get(Uri.parse(url));
-      print("📦 HTTP Durum: ${response.statusCode}");
+      print("HTTP Durum: ${response.statusCode}");
 
       if (response.statusCode != 200) {
         throw Exception("Dosya indirilemedi.");
@@ -145,24 +144,24 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
       final safeName = fileName.replaceAll("%", "_");
       final filePath = "${tempDir.path}/$safeName";
 
-      print("💾 Dosya yazılıyor: $filePath");
+      print("Dosya yazılıyor: $filePath");
       final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
 
-      print("📂 Dosya açılıyor...");
+      print("Dosya açılıyor...");
       final result = await OpenFile.open(filePath);
-      print("✅ Açma sonucu: ${result.message}");
+      print("Açma sonucu: ${result.message}");
 
       if (result.type != ResultType.done) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("⚠️ Dosya açılamadı: ${result.message}")),
+          SnackBar(content: Text("Dosya açılamadı: ${result.message}")),
         );
       }
     } catch (e) {
-      print("❌ Hata: $e");
+      print("Hata: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ Dosya açılırken hata: $e")),
+          SnackBar(content: Text(" Dosya açılırken hata: $e")),
         );
       }
     }
@@ -179,7 +178,7 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
   @override
   Widget build(BuildContext context) {
     print(
-        "🧱 build() çalıştı | isLoading: $isLoading | Dosya sayısı: ${files.length}");
+        "build() çalıştı | isLoading: $isLoading | Dosya sayısı: ${files.length}");
 
     return Scaffold(
       appBar: AppBar(

@@ -17,21 +17,20 @@ class _UserEditScreenState extends State<UserEditScreen> {
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
   late TextEditingController _passwordController;
-  late TextEditingController _emailController; // ✨ eklendi
+  late TextEditingController _emailController;
   late String _role;
   late String _unit;
 
   final List<String> _units = [
     'Muhasebe',
-    'Pazarlama',
-    'IK',
     'Satin Alma',
     'Finans',
     'Bilgi Islem',
     'Satis',
     'Kalite',
     'Lojistik',
-    'Sekretarya'
+    'Genel Mudur',
+    'Fabrika Muduru'
   ];
 
   @override
@@ -40,8 +39,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
     _nameController = TextEditingController(text: widget.user['name']);
     _usernameController = TextEditingController(text: widget.user['username']);
     _passwordController = TextEditingController();
-    _emailController =
-        TextEditingController(text: widget.user['email'] ?? ''); // ✨
+    _emailController = TextEditingController(text: widget.user['email'] ?? '');
     _role = widget.user['role'] ?? 'User';
     _unit = _units.contains(widget.user['unit'])
         ? widget.user['unit']
@@ -59,7 +57,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
             'name': _nameController.text,
             'unit': _unit,
             'role': _role,
-            'email': _emailController.text, // ✨
+            'email': _emailController.text,
             'password': _passwordController.text.isNotEmpty
                 ? _passwordController.text
                 : null,
@@ -214,7 +212,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
                       .toList(),
                   onChanged: (value) => setState(() => _role = value!),
                 ),
-                const SizedBox(height: 80), // boşluk bırak ekran altına
+                const SizedBox(height: 80),
               ],
             ),
           ),

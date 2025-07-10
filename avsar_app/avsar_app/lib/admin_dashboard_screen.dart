@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_screen.dart';
 import 'file_management_screen.dart';
+import 'profile_settings_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final String baseUrl;
@@ -80,6 +81,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   "Birim: $unit | Yetki: $role",
                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProfileSettingsScreen(
+                        usernameFromAdmin: username,
+                        unitFromAdmin: unit,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 130),
@@ -125,7 +137,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     MaterialPageRoute(
                       builder: (context) => FileManagementScreen(
                         baseUrl: widget.baseUrl,
-                        username: username, // ✅ GEREKLİ PARAMETRE EKLENDİ
+                        username: username,
                       ),
                     ),
                   );

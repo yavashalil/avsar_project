@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class ProfileSettingsScreen extends StatefulWidget {
-  const ProfileSettingsScreen({super.key});
+  final String? usernameFromAdmin;
+  final String? unitFromAdmin;
+
+  const ProfileSettingsScreen(
+      {super.key, this.usernameFromAdmin, this.unitFromAdmin});
 
   @override
-  _ProfileSettingsScreenState createState() => _ProfileSettingsScreenState();
+  State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
 }
 
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   String username = "Bilinmiyor";
   String unit = "Bilinmiyor";
-  String selectedLanguage = "Türkçe";
   final String baseUrl = "http://10.0.2.2:5000";
 
   @override
@@ -23,24 +26,29 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   Future<void> loadUserData() async {
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (widget.usernameFromAdmin != null && widget.unitFromAdmin != null) {
       setState(() {
-        username = prefs.getString('username') ?? "Bilinmiyor";
-        unit = prefs.getString('unit') ?? "Bilinmiyor";
-        selectedLanguage = prefs.getString('language') ?? "Türkçe";
+        username = widget.usernameFromAdmin!;
+        unit = widget.unitFromAdmin!;
       });
-    } catch (e) {
-      print("Kullanıcı verileri yüklenirken hata oluştu: $e");
+    } else {
+      try {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        setState(() {
+          username = prefs.getString('username') ?? "Bilinmiyor";
+          unit = prefs.getString('unit') ?? "Bilinmiyor";
+        });
+      } catch (e) {
+        print("Kullanıcı verileri yüklenirken hata oluştu: $e");
+      }
     }
   }
 
   void _changePassword() {
+    final TextEditingController _passwordController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) {
-        final TextEditingController _passwordController =
-            TextEditingController();
         return AlertDialog(
           title: const Text("Şifre Değiştir"),
           content: TextField(
@@ -92,14 +100,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': newPassword}),
       );
-
-      if (response.statusCode == 200) {
-        return true;
-      } else {
-        print(
-            "Şifre değişikliği başarısız! HTTP Hata Kodu: ${response.statusCode}");
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
       print("API çağrısı başarısız: $e");
       return false;
@@ -173,30 +174,26 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               ),
             ),
             const SizedBox(height: 50),
-            Center(
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _changePassword,
-                  icon: const Icon(Icons.lock, color: Colors.white),
-                  label: const Text("Şifre Değiştir"),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.blue,
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _changePassword,
+                icon: const Icon(Icons.lock, color: Colors.white),
+                label: const Text("Şifre Değiştir"),
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.blue,
                 ),
               ),
             ),
             const Spacer(),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.exit_to_app, color: Colors.white),
-                label: const Text("Çıkış Yap"),
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.red,
-                ),
+            ElevatedButton.icon(
+              onPressed: _logout,
+              icon: const Icon(Icons.exit_to_app, color: Colors.white),
+              label: const Text("Çıkış Yap"),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.red,
               ),
             ),
           ],

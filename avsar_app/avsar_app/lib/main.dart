@@ -91,11 +91,11 @@ class _MyAppState extends State<MyApp> {
         badge: true,
         sound: true,
       );
-      print("📢 Bildirim izni durumu: ${settings.authorizationStatus}");
+      print("Bildirim izni durumu: ${settings.authorizationStatus}");
 
       final token = await fcm.getToken();
       if (token != null) {
-        debugPrint("🔑 FCM TOKEN: $token");
+        debugPrint("FCM TOKEN: $token");
         await prefs.setString("fcmToken", token);
       }
 
@@ -114,7 +114,7 @@ class _MyAppState extends State<MyApp> {
 
       setState(() {});
     } catch (e) {
-      debugPrint("❌ Hata oluştu: $e");
+      debugPrint("Hata oluştu: $e");
       setState(() => _initialRoute = "/login");
     }
   }

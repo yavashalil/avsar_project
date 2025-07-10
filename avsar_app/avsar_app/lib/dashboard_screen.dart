@@ -78,8 +78,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> openFile(String relativePath) async {
-    final url = Uri.parse(
-        "$baseUrl/files/download/${Uri.encodeComponent(relativePath)}");
+    final url =
+        Uri.parse("$baseUrl/files/open/${Uri.encodeComponent(relativePath)}");
 
     try {
       final response = await http.get(url);
