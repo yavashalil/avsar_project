@@ -1,23 +1,26 @@
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
-import asyncpg
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
 import bcrypt
 import os
 from datetime import datetime
 from urllib.parse import unquote
-from fastapi.responses import StreamingResponse
 import unicodedata
 import mimetypes
 import urllib
+from message_routes import router as message_router
+from database import get_db, Base, engine
+from message_models import Message
 
 app = FastAPI()
+app.include_router(message_router)
 
-DATABASE_URL = "postgresql://postgres:Halil0648.@localhost:5432/avsar_db"
+Base.metadata.create_all(bind=engine)
+
 ORTAK_DOSYA_YOLU = r"\\192.168.2.7\data\ORTAK"
-
-async def get_db():
-    return await asyncpg.connect(DATABASE_URL)
 
 class User(BaseModel):
     name: str
@@ -39,110 +42,106 @@ def normalize(text: str):
     return unicodedata.normalize("NFKD", text).encode("ASCII", "ignore").decode().lower().replace(" ", "")
 
 @app.on_event("startup")
-async def startup():
-    conn = await get_db()
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            unit TEXT NOT NULL,
-            role TEXT NOT NULL,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT NOT NULL,
-            password TEXT NOT NULL
-        )
-    """)
-    await conn.close()
-
+def startup():
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                unit TEXT NOT NULL,
+                role TEXT NOT NULL,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT NOT NULL,
+                password TEXT NOT NULL
+            )
+        """))
 
 @app.get("/users/", response_model=List[User])
-async def get_users():
-    conn = await get_db()
-    rows = await conn.fetch("SELECT name, unit, role, username, email, password FROM users")
-    await conn.close()
+def get_users():
+    db = next(get_db())
+    rows = db.execute(text("SELECT name, unit, role, username, email, password FROM users")).fetchall()
     return [
         {
-            "name": row["name"],
-            "unit": row["unit"],
-            "role": row["role"],
-            "username": row["username"],
-            "email": row["email"],
-            "password": row["password"]
+            "name": row[0],
+            "unit": row[1],
+            "role": row[2],
+            "username": row[3],
+            "email": row[4],
+            "password": row[5]
         }
-        for row in rows 
+        for row in rows
     ]
 
-
 @app.post("/users/")
-async def add_user(user: User):
-    if not user.password:  
+def add_user(user: User):
+    if not user.password:
         raise HTTPException(status_code=400, detail="Şifre boş bırakılamaz.")
-
-    conn = await get_db()
+    db = next(get_db())
     hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
     try:
-        await conn.execute(
-            "INSERT INTO users (name, unit, role, username, email, password) VALUES ($1, $2, $3, $4, $5, $6)",
-            user.name, user.unit, user.role, user.username, user.email, hashed_password
-        )
-    except asyncpg.UniqueViolationError:
-        await conn.close()
+        db.execute(text(
+            "INSERT INTO users (name, unit, role, username, email, password) VALUES (:name, :unit, :role, :username, :email, :password)"
+        ), {
+            "name": user.name,
+            "unit": user.unit,
+            "role": user.role,
+            "username": user.username,
+            "email": user.email,
+            "password": hashed_password
+        })
+        db.commit()
+    except Exception:
+        db.rollback()
         raise HTTPException(status_code=400, detail="Bu kullanıcı adı zaten mevcut.")
-
-    await conn.close()
     return {"message": "Kullanıcı başarıyla eklendi"}
 
-
 @app.put("/users/{username}")
-async def update_user(username: str, user: User):
-    conn = await get_db()
-    existing_user = await conn.fetchrow("SELECT password FROM users WHERE username = $1", username)
-    if not existing_user:
-        await conn.close()
+def update_user(username: str, user: User):
+    db = next(get_db())
+    result = db.execute(text("SELECT password FROM users WHERE username = :username"), {"username": username}).fetchone()
+    if not result:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
-    hashed_password = existing_user["password"]
+    hashed_password = result[0]
     if user.password:
         hashed_password = bcrypt.hashpw(user.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    await conn.execute(
-        "UPDATE users SET name=$1, unit=$2, role=$3, email=$4, password=$5 WHERE username=$6",
-        user.name, user.unit, user.role, user.email, hashed_password, username
-    )
-    await conn.close()
+    db.execute(text("""
+        UPDATE users SET name=:name, unit=:unit, role=:role, email=:email, password=:password WHERE username=:username
+    """), {
+        "name": user.name,
+        "unit": user.unit,
+        "role": user.role,
+        "email": user.email,
+        "password": hashed_password,
+        "username": username
+    })
+    db.commit()
     return {"message": "Kullanıcı başarıyla güncellendi"}
 
 @app.put("/change_password")
-async def change_password(data: PasswordChangeRequest):
-    conn = await get_db()
-
-    user = await conn.fetchrow("SELECT * FROM users WHERE username = $1", data.username)
+def change_password(data: PasswordChangeRequest):
+    db = next(get_db())
+    user = db.execute(text("SELECT * FROM users WHERE username = :username"), {"username": data.username}).fetchone()
     if not user:
-        await conn.close()
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
-
     hashed_password = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-    await conn.execute(
-        "UPDATE users SET password = $1 WHERE username = $2",
-        hashed_password, data.username
-    )
-
-    await conn.close()
+    db.execute(text("UPDATE users SET password = :password WHERE username = :username"), {
+        "password": hashed_password,
+        "username": data.username
+    })
+    db.commit()
     return {"message": "Şifre başarıyla güncellendi"}
 
-
 @app.post("/login")
-async def login(user: LoginRequest):
-    conn = await get_db()
-    result = await conn.fetchrow("SELECT name, password, role, unit, email FROM users WHERE username = $1", user.username)
-    if result is None:
-        await conn.close()
+def login(user: LoginRequest):
+    db = next(get_db())
+    result = db.execute(text("SELECT name, password, role, unit, email FROM users WHERE username = :username"), {
+        "username": user.username
+    }).fetchone()
+    if not result:
         raise HTTPException(status_code=401, detail="Geçersiz kullanıcı adı veya şifre")
-    stored_name, stored_password, role, unit, email = result["name"], result["password"], result["role"], result["unit"], result["email"]
+    stored_name, stored_password, role, unit, email = result
     if not bcrypt.checkpw(user.password.encode("utf-8"), stored_password.encode("utf-8")):
-        await conn.close()
         raise HTTPException(status_code=401, detail="Geçersiz kullanıcı adı veya şifre")
-    await conn.close()
     return {
         "message": "Giriş başarılı",
         "username": user.username,
@@ -152,34 +151,28 @@ async def login(user: LoginRequest):
         "email": email
     }
 
-
 @app.delete("/users/{username}")
-async def delete_user(username: str):
-    conn = await get_db()
-    result = await conn.execute("DELETE FROM users WHERE username = $1", username)
-    await conn.close()
-    if result == "DELETE 0":
+def delete_user(username: str):
+    db = next(get_db())
+    result = db.execute(text("DELETE FROM users WHERE username = :username"), {"username": username})
+    db.commit()
+    if result.rowcount == 0:
         raise HTTPException(status_code=404, detail=f"Kullanıcı '{username}' bulunamadı.")
     return {"message": f"Kullanıcı '{username}' başarıyla silindi"}
 
 @app.get("/files/open/{file_path:path}")
-async def open_file(file_path: str):
+def open_file(file_path: str):
     decoded = unquote(file_path, encoding="utf-8")
     absolute_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded))
-
     if not os.path.exists(absolute_path) or not os.path.isfile(absolute_path):
         raise HTTPException(status_code=404, detail="Dosya bulunamadı")
-
     if not absolute_path.startswith(os.path.abspath(ORTAK_DOSYA_YOLU)):
         raise HTTPException(status_code=403, detail="Erişim reddedildi")
-
     mime_type, _ = mimetypes.guess_type(absolute_path)
     filename = os.path.basename(absolute_path)
-
     try:
         file = open(absolute_path, "rb")
         encoded_filename = urllib.parse.quote(filename)
-
         return StreamingResponse(
             file,
             media_type=mime_type or "application/pdf",
@@ -193,42 +186,34 @@ async def open_file(file_path: str):
         raise HTTPException(status_code=500, detail=f"Sunucu hatası: {e}")
 
 @app.get("/files/browse")
-async def browse_folder(path: Optional[str] = Query(default=""), username: str = Query(...)):
-    conn = await get_db()
-    user = await conn.fetchrow("SELECT unit, role FROM users WHERE username=$1", username)
-    await conn.close()
-
+def browse_folder(path: Optional[str] = Query(default=""), username: str = Query(...)):
+    db = next(get_db())
+    user = db.execute(text("SELECT unit, role FROM users WHERE username = :username"), {
+        "username": username
+    }).fetchone()
     if not user:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
-
-    role = user["role"]
-    unit = user["unit"]
-
+    role, unit = user[1], user[0]
     unit_access_map = {
-        "Satis": ["BİM PALET GÜNCEL", "ESKİ SATIŞ", "İHRACAT 2022", "İHRACAT ÜRÜN FOTOLARI"],
+        "Satis": ["BİM PALET GÜNCEL", "ESKİ SATIŞ", "İHRACAT 2022", "İHRACAT ÜRÜN FOTOLARI", "PAZARLAMA"],
         "Bilgi Islem": ["BILGI ISLEM"],
         "Muhasebe": ["001-ŞUAYP DEMİREL MADENSUYU A.Ş (MUHASEBE)"],
         "Finans": ["FİNANS"],
-        "Kalite": ["KALİTE", "ÜRETİM SAVUNMA TUTANAK"],  
+        "Kalite": ["KALİTE", "ÜRETİM SAVUNMA TUTANAK"],
         "Lojistik": ["LOJISTIK"],
         "Satin Alma": ["REKLAM-GÖRSEL", "SATINALMA"],
     }
-
     decoded_path = unquote(path)
     full_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded_path))
-
     if not full_path.startswith(os.path.abspath(ORTAK_DOSYA_YOLU)):
         raise HTTPException(status_code=403, detail="Geçersiz erişim")
-
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Klasör bulunamadı")
-
     try:
         items = []
         with os.scandir(full_path) as entries:
             for entry in entries:
                 if role != "Admin":
-            
                     if not decoded_path:
                         allowed_folders = unit_access_map.get(unit, [])
                         if entry.name not in allowed_folders:
@@ -237,7 +222,6 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
                         allowed_prefixes = unit_access_map.get(unit, [])
                         if not any(decoded_path.startswith(folder) for folder in allowed_prefixes):
                             continue
-
                 item = {
                     "name": entry.name,
                     "type": "file" if entry.is_file() else "directory",
@@ -249,4 +233,3 @@ async def browse_folder(path: Optional[str] = Query(default=""), username: str =
         return items
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Sunucu hatası: {e}")
-

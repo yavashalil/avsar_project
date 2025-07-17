@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'profile_settings_screen.dart';
+import 'notification_inbox_screen.dart';
+import 'send_notification_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -112,9 +114,109 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool get isInSubFolder => currentPath.isNotEmpty;
 
+  void navigateBack() {
+    if (isInSubFolder) {
+      final parent = currentPath.contains("/")
+          ? currentPath.substring(0, currentPath.lastIndexOf("/"))
+          : "";
+      fetchFiles(parent);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        backgroundColor: Colors.white,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 50, 16, 24),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF9C27B0),
+                    Color(0xFF7B1FA2),
+                    Color(0xFF6A1B9A),
+                  ],
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text("Birim: $unit",
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 15)),
+                  Text("Yetki: $role",
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 15)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.send, color: Colors.purple),
+                  title: const Text("Bildirim Gönder"),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const SendNotificationScreen()),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ListTile(
+                  leading:
+                      const Icon(Icons.notifications, color: Colors.purple),
+                  title: const Text("Bildirimlerim"),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const NotificationInboxScreen()),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
       appBar: AppBar(
         centerTitle: true,
         title: const Text(
@@ -122,19 +224,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.purple,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (isInSubFolder) {
-              final parent = currentPath.contains("/")
-                  ? currentPath.substring(0, currentPath.lastIndexOf("/"))
-                  : "";
-              fetchFiles(parent);
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          if (isInSubFolder)
+            IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              tooltip: "Geri",
+              onPressed: navigateBack,
+            )
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -168,7 +266,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const SizedBox(height: 10),
             Expanded(
               child: isLoadingFiles
                   ? const Center(child: CircularProgressIndicator())

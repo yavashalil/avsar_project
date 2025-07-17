@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -61,6 +62,7 @@ void main() async {
   globalUsername = prefs.getString("username");
 
   await _initializeLocalNotifications();
+  await initializeDateFormatting('tr_TR', null);
   runApp(const MyApp());
 }
 
