@@ -12,7 +12,7 @@ from collections import defaultdict
 from urllib.parse import quote
 
 
-DATABASE_URL = "postgresql://postgres:Halil0648.@localhost:5432/avsar_db"
+DATABASE_URL = "postgresql://postgres:<sifre>@localhost:5432/avsar_db"
 IZLENECEK_KLASORLER = [
     r"\\192.168.2.7\data\ORTAK\KALİTE\4. FORMLAR",
     r"\\192.168.2.7\data\ORTAK\KALİTE\10. TALİMATLAR",
