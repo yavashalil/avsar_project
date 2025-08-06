@@ -25,9 +25,19 @@ class _AdminScreenState extends State<AdminScreen> {
 
     baseUrl = dotenv.env['BASE_URL'] ?? '';
 
+    if (baseUrl.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Sunucu adresi bulunamadı. Lütfen yapılandırmayı kontrol edin.")),
+        );
+        Navigator.pop(context);
+      });
+      return;
+    }
+
     if (widget.role != "Admin") {
-      Future.microtask(() {
-        Navigator.pop(context); 
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Bu sayfaya erişim izniniz yok.")),
         );
@@ -41,7 +51,8 @@ class _AdminScreenState extends State<AdminScreen> {
     try {
       final token = await storage.read(key: 'token');
       if (token == null) {
-        throw Exception("Token bulunamadı, lütfen tekrar giriş yapın.");
+        _handleSessionExpired();
+        return;
       }
 
       final response = await http.get(
@@ -58,10 +69,10 @@ class _AdminScreenState extends State<AdminScreen> {
         );
 
         if (mounted) {
-          setState(() {
-            users = fetchedUsers;
-          });
+          setState(() => users = fetchedUsers);
         }
+      } else if (response.statusCode == 401) {
+        _handleSessionExpired();
       } else if (response.statusCode == 403) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Yetkisiz erişim.")),
@@ -72,17 +83,26 @@ class _AdminScreenState extends State<AdminScreen> {
         );
       }
     } catch (e) {
-      print("Kullanıcıları çekerken hata oluştu: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Hata: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Kullanıcıları çekerken hata: $e")),
+        );
+      }
     }
+  }
+
+  void _handleSessionExpired() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Oturum süresi doldu, lütfen tekrar giriş yapın.")),
+    );
+    storage.deleteAll();
+    Navigator.pushReplacementNamed(context, "/login");
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.role != "Admin") {
-      return const SizedBox(); 
+      return const SizedBox();
     }
 
     return Scaffold(
@@ -137,33 +157,34 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
             ),
             const SizedBox(height: 10),
-            Center(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text(
-                  "Kullanıcı Ekle",
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            if (widget.role == "Admin")
+              Center(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text(
+                    "Kullanıcı Ekle",
+                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UserAddScreen(
-                        baseUrl: baseUrl,
-                      ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ).then((_) => fetchUsers());
-                },
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserAddScreen(
+                          baseUrl: baseUrl,
+                        ),
+                      ),
+                    ).then((_) => fetchUsers());
+                  },
+                ),
               ),
-            ),
           ],
         ),
       ),
