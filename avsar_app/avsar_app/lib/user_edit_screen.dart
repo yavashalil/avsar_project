@@ -52,7 +52,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
   }
 
   bool _validatePassword(String password) {
-    return password.isEmpty || // Boş ise opsiyonel alan
+    return password.isEmpty || 
         (password.length >= 8 &&
         RegExp(r'[A-Z]').hasMatch(password) &&
         RegExp(r'[a-z]').hasMatch(password) &&
