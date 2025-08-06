@@ -17,7 +17,6 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 WATCH_FOLDERS = os.getenv("WATCH_FOLDERS", "").split(";")
 WATCH_BASE_PATH = os.getenv("WATCH_BASE_PATH")
-LOG_FILE = os.getenv("LOG_FILE", "kalite_dosya_loglari.txt")
 FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", os.path.join(os.path.dirname(__file__), "service-account.json"))
 FCM_TEST_DEVICE_TOKEN = os.getenv("FCM_TEST_DEVICE_TOKEN")
 VALID_EXTENSIONS = [".xlsx", ".xls", ".csv", ".pdf", ".doc", ".docx"]
@@ -41,7 +40,6 @@ def db_insert_log(zaman, event_type, filename):
 
 def send_fcm_notification(zaman, event_type, full_path, filename):
     try:
-        # .env'den alınan base path ile normalize et
         relative_path = os.path.relpath(full_path, WATCH_BASE_PATH).replace("\\", "/")
         encoded_path = quote(relative_path, safe="/()~$-_")
 
