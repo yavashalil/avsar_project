@@ -1,49 +1,90 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'user_edit_screen.dart';
 import 'user_add_screen.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key, required String baseUrl});
+  final String role;
+  const AdminScreen({super.key, required this.role});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
 class _AdminScreenState extends State<AdminScreen> {
+  final storage = const FlutterSecureStorage();
   List<Map<String, dynamic>> users = [];
-  final String baseUrl = "http://10.0.2.2:5000";
+  late String baseUrl;
 
   @override
   void initState() {
     super.initState();
-    fetchUsers();
+
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
+
+    if (widget.role != "Admin") {
+      Future.microtask(() {
+        Navigator.pop(context); 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Bu sayfaya erişim izniniz yok.")),
+        );
+      });
+    } else {
+      fetchUsers();
+    }
   }
 
   Future<void> fetchUsers() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/users/'));
+      final token = await storage.read(key: 'token');
+      if (token == null) {
+        throw Exception("Token bulunamadı, lütfen tekrar giriş yapın.");
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/'),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
+      );
+
       if (response.statusCode == 200) {
         List<Map<String, dynamic>> fetchedUsers =
             List<Map<String, dynamic>>.from(
-                jsonDecode(utf8.decode(response.bodyBytes)));
+          jsonDecode(utf8.decode(response.bodyBytes)),
+        );
 
         if (mounted) {
           setState(() {
             users = fetchedUsers;
           });
         }
+      } else if (response.statusCode == 403) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Yetkisiz erişim.")),
+        );
       } else {
-        print("Kullanıcılar yüklenemedi! Hata kodu: ${response.statusCode}");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Kullanıcılar yüklenemedi! (${response.statusCode})")),
+        );
       }
     } catch (e) {
       print("Kullanıcıları çekerken hata oluştu: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Hata: $e")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.role != "Admin") {
+      return const SizedBox(); 
+    }
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -99,8 +140,10 @@ class _AdminScreenState extends State<AdminScreen> {
             Center(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text("Kullanıcı Ekle",
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
+                label: const Text(
+                  "Kullanıcı Ekle",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
                   padding:
@@ -113,9 +156,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const UserAddScreen(
-                              baseUrl: 'http://10.0.2.2:5000',
-                            )),
+                      builder: (context) => UserAddScreen(
+                        baseUrl: baseUrl,
+                      ),
+                    ),
                   ).then((_) => fetchUsers());
                 },
               ),
