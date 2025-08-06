@@ -3,37 +3,39 @@ import 'package:avsar_app/file_management_screen.dart';
 import 'package:avsar_app/login_screen.dart';
 import 'package:avsar_app/dashboard_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
-
-String? globalUsername;
+final storage = const FlutterSecureStorage();
 
 Future<void> _initializeLocalNotifications() async {
-  const AndroidInitializationSettings androidSettings =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  final InitializationSettings initSettings =
-      InitializationSettings(android: androidSettings);
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  final initSettings = InitializationSettings(android: androidSettings);
 
   await flutterLocalNotificationsPlugin.initialize(
     initSettings,
-    onDidReceiveNotificationResponse: (response) {
+    onDidReceiveNotificationResponse: (response) async {
       final payload = response.payload;
-      if (payload != null && payload.isNotEmpty && globalUsername != null) {
+      final username = await storage.read(key: "username");
+
+      if (payload != null && payload.isNotEmpty && username != null) {
+        if (payload.contains("..")) {
+          debugPrint("Geçersiz dosya yolu engellendi: $payload");
+          return;
+        }
         Future.delayed(const Duration(milliseconds: 300), () {
           navigatorKey.currentState?.push(MaterialPageRoute(
             builder: (_) => FileManagementScreen(
-              baseUrl: "http://10.0.2.2:5000",
+              baseUrl: dotenv.env['BASE_URL'] ?? '',
               initialPath: payload,
-              username: globalUsername!,
+              username: username,
             ),
           ));
         });
@@ -41,7 +43,7 @@ Future<void> _initializeLocalNotifications() async {
     },
   );
 
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  const channel = AndroidNotificationChannel(
     'default_channel',
     'Genel Bildirimler',
     description: 'Uygulama açıkken gelen bildirimler',
@@ -56,10 +58,8 @@ Future<void> _initializeLocalNotifications() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
-
-  final prefs = await SharedPreferences.getInstance();
-  globalUsername = prefs.getString("username");
 
   await _initializeLocalNotifications();
   await initializeDateFormatting('tr_TR', null);
@@ -85,26 +85,21 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _setupInitialLogic() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final fcm = FirebaseMessaging.instance;
-
       var settings = await fcm.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
-      print("Bildirim izni durumu: ${settings.authorizationStatus}");
+      debugPrint("Bildirim izni durumu: ${settings.authorizationStatus}");
 
       final token = await fcm.getToken();
       if (token != null) {
-        debugPrint("FCM TOKEN: $token");
-        await prefs.setString("fcmToken", token);
+        await storage.write(key: "fcmToken", value: token);
       }
 
-      final username = prefs.getString('username') ?? "Bilinmiyor";
-      final role = prefs.getString('role') ?? "User";
-
-      globalUsername = username;
+      final username = await storage.read(key: 'username') ?? "Bilinmiyor";
+      final role = await storage.read(key: 'role') ?? "User";
 
       if (username == "Bilinmiyor" || role == "User") {
         _initialRoute = "/login";
@@ -128,9 +123,7 @@ class _MyAppState extends State<MyApp> {
       }
     });
 
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _handleMessage(message);
-    });
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessage);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final message = await FirebaseMessaging.instance.getInitialMessage();
@@ -140,17 +133,23 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  void _handleMessage(RemoteMessage message) {
+  void _handleMessage(RemoteMessage message) async {
     final relativePath = message.data['fileurl'];
+    final username = await storage.read(key: "username");
+
     if (relativePath != null &&
         relativePath.isNotEmpty &&
-        globalUsername != null) {
+        username != null) {
+      if (relativePath.contains("..")) {
+        debugPrint("Geçersiz dosya yolu engellendi: $relativePath");
+        return;
+      }
       Future.delayed(const Duration(milliseconds: 300), () {
         navigatorKey.currentState?.push(MaterialPageRoute(
           builder: (_) => FileManagementScreen(
-            baseUrl: "http://10.0.2.2:5000",
+            baseUrl: dotenv.env['BASE_URL'] ?? '',
             initialPath: relativePath,
-            username: globalUsername!,
+            username: username,
           ),
         ));
       });
@@ -192,7 +191,8 @@ class _MyAppState extends State<MyApp> {
       routes: {
         "/login": (context) => const LoginScreen(),
         "/dashboard": (context) => const DashboardScreen(),
-        "/admin": (context) => const AdminDashboardScreen(baseUrl: ''),
+        "/admin": (context) =>
+            AdminDashboardScreen(baseUrl: dotenv.env['BASE_URL'] ?? ''),
       },
     );
   }
