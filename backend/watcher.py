@@ -15,12 +15,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-IZLENECEK_KLASORLER = os.getenv("WATCH_FOLDERS", "").split(";")
-LOG_DOSYASI = os.getenv("LOG_FILE", "kalite_dosya_loglari.txt")
-GECERLI_UZANTILAR = [".xlsx", ".xls", ".csv", ".pdf", ".doc", ".docx"]
-
+WATCH_FOLDERS = os.getenv("WATCH_FOLDERS", "").split(";")
+WATCH_BASE_PATH = os.getenv("WATCH_BASE_PATH", r"\\192.168.2.7\data")
+LOG_FILE = os.getenv("LOG_FILE", "kalite_dosya_loglari.txt")
 FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", os.path.join(os.path.dirname(__file__), "service-account.json"))
 FCM_TEST_DEVICE_TOKEN = os.getenv("FCM_TEST_DEVICE_TOKEN")
+VALID_EXTENSIONS = [".xlsx", ".xls", ".csv", ".pdf", ".doc", ".docx"]
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CRED_PATH)
@@ -41,7 +41,8 @@ def db_insert_log(zaman, event_type, filename):
 
 def send_fcm_notification(zaman, event_type, full_path, filename):
     try:
-        relative_path = os.path.relpath(full_path, r"\\192.168.2.7\data").replace("\\", "/")
+        # .env'den alınan base path ile normalize et
+        relative_path = os.path.relpath(full_path, WATCH_BASE_PATH).replace("\\", "/")
         encoded_path = quote(relative_path, safe="/()~$-_")
 
         title = "Dosya Takibi:"
@@ -85,11 +86,11 @@ class ExcelWatcherHandler(FileSystemEventHandler):
         self.bildirim_suresi = 60
 
     def log_change(self, event_type: str, path: str):
-        if not any(path.startswith(klasor) for klasor in IZLENECEK_KLASORLER):
+        if not any(path.startswith(klasor) for klasor in WATCH_FOLDERS):
             return
 
         filename = os.path.basename(path)
-        if not any(filename.lower().endswith(ext) for ext in GECERLI_UZANTILAR):
+        if not any(filename.lower().endswith(ext) for ext in VALID_EXTENSIONS):
             return
 
         zaman = datetime.now()
@@ -112,7 +113,7 @@ class ExcelWatcherHandler(FileSystemEventHandler):
             f"{event_type:<10} | {filename:<40}\n"
         )
 
-        with open(LOG_DOSYASI, "a", encoding="utf-8") as f:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(satir)
 
         try:
@@ -135,13 +136,13 @@ class ExcelWatcherHandler(FileSystemEventHandler):
 
 if __name__ == "__main__":
     print("İzlenen klasörler:")
-    for k in IZLENECEK_KLASORLER:
+    for k in WATCH_FOLDERS:
         print(f"  - {k}")
 
     observer = Observer()
     handler = ExcelWatcherHandler()
 
-    for klasor in IZLENECEK_KLASORLER:
+    for klasor in WATCH_FOLDERS:
         observer.schedule(handler, path=klasor, recursive=True)
 
     observer.start()
