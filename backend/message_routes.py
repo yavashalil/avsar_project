@@ -9,7 +9,7 @@ from auth import get_current_user
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
-ALLOWED_TAGS = []  # HTML etiketlerine izin vermek istersen ekle
+ALLOWED_TAGS = []  
 MAX_CONTENT_LENGTH = 5000
 MAX_FILE_PATH_LENGTH = 255
 
