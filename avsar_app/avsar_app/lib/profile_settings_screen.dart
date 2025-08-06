@@ -1,46 +1,49 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 class ProfileSettingsScreen extends StatefulWidget {
   final String? usernameFromAdmin;
   final String? unitFromAdmin;
 
-  const ProfileSettingsScreen(
-      {super.key, this.usernameFromAdmin, this.unitFromAdmin});
+  const ProfileSettingsScreen({super.key, this.usernameFromAdmin, this.unitFromAdmin});
 
   @override
   State<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
 }
 
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
+  final storage = const FlutterSecureStorage();
   String username = "Bilinmiyor";
   String unit = "Bilinmiyor";
-  final String baseUrl = "http://10.0.2.2:5000";
+  late String baseUrl;
 
   @override
   void initState() {
     super.initState();
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
     loadUserData();
   }
 
   Future<void> loadUserData() async {
-    if (widget.usernameFromAdmin != null && widget.unitFromAdmin != null) {
-      setState(() {
-        username = widget.usernameFromAdmin!;
-        unit = widget.unitFromAdmin!;
-      });
-    } else {
-      try {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
+    try {
+      if (widget.usernameFromAdmin != null && widget.unitFromAdmin != null) {
         setState(() {
-          username = prefs.getString('username') ?? "Bilinmiyor";
-          unit = prefs.getString('unit') ?? "Bilinmiyor";
+          username = widget.usernameFromAdmin!;
+          unit = widget.unitFromAdmin!;
         });
-      } catch (e) {
-        print("Kullanıcı verileri yüklenirken hata oluştu: $e");
+      } else {
+        final storedUsername = await storage.read(key: 'username');
+        final storedUnit = await storage.read(key: 'unit');
+        setState(() {
+          username = storedUsername ?? "Bilinmiyor";
+          unit = storedUnit ?? "Bilinmiyor";
+        });
       }
+    } catch (e) {
+      debugPrint("Kullanıcı verileri yüklenirken hata: $e");
     }
   }
 
@@ -64,9 +67,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
             ElevatedButton(
               onPressed: () async {
                 String newPassword = _passwordController.text.trim();
-                if (newPassword.isEmpty) {
+                
+                if (newPassword.isEmpty || newPassword.length < 8) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Şifre boş olamaz!")),
+                    const SnackBar(content: Text("Şifre en az 8 karakter olmalı!")),
                   );
                   return;
                 }
@@ -74,14 +78,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 bool success = await changePassword(newPassword);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text("Şifre başarıyla güncellendi.")),
+                    const SnackBar(content: Text("Şifre başarıyla güncellendi.")),
                   );
                   Navigator.pop(context);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text("Şifre güncelleme başarısız!")),
+                    const SnackBar(content: Text("Şifre güncelleme başarısız!")),
                   );
                 }
               },
@@ -95,21 +97,26 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   Future<bool> changePassword(String newPassword) async {
     try {
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı!");
+
       final response = await http.put(
         Uri.parse('$baseUrl/change_password'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({'username': username, 'password': newPassword}),
       );
       return response.statusCode == 200;
     } catch (e) {
-      print("API çağrısı başarısız: $e");
+      debugPrint("API çağrısı başarısız: $e");
       return false;
     }
   }
 
   void _logout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await storage.deleteAll();
     if (mounted) {
       Navigator.pushReplacementNamed(context, "/login");
     }
