@@ -1,13 +1,31 @@
-Avsar App is a corporate mobile application that enables internal users to securely access department-specific files and provides administrators with user management and communication capabilities.
+Avsar App is a corporate mobile application designed to enable employees to securely, quickly, and efficiently access department-specific files, while providing managers with powerful tools for user management, internal communication, and file change tracking.
 
-Through the app, users can browse and open files, while administrators can manage user accounts, assign roles, and maintain full control over the system.
+Department-Based File Access:
+Users can only view and open folders assigned to their own department.
+Files can be opened directly within the app for quick review without unnecessary downloads.
 
-Automated Notification System:
-The app detects changes made to shared folders in real time and sends instant notifications to administrators.
-This allows admins to quickly recognize when a file has been modified. By tapping on the notification, they are directed to the related file and can immediately review the changes made.
+Real-Time Automatic Notification System:
+Any addition, deletion, or modification to shared folders is detected instantly.
+Managers receive real-time notifications when a change occurs.
+Tapping a notification takes the user directly to the file, allowing immediate review of the changes.
 
-Send Notifications to Users:
-Administrators can also send custom messages and subject-based notifications to specific users.
-Users receive these messages within the app through the “My Notifications” screen, and can easily view the details or respond if needed.
+Direct Messaging & Targeted Notifications:
+Managers can send topic-based or user-specific messages and notifications.
+Employees can view these in the "My Notifications" screen, check details, and reply if necessary.
 
-Avsar streamlines document management, internal communication, and secure access—bringing them all together in one platform to make in-house digital workflows faster, more transparent, and more effective.
+User & Role Management:
+Managers can add, update, or remove user accounts and change user roles directly from the application.
+Roles automatically define department-based access permissions.
+
+Technical Stack:
+Mobile Application: Flutter (Dart)
+Backend API: Python FastAPI
+Database: PostgreSQL
+Real-Time File Monitoring: Python watchdog library
+Notification System: Firebase Cloud Messaging (FCM)
+Authentication & Authorization: JWT-based session management
+Secure Data Storage: .env environment variables, flutter_secure_storage for sensitive data
+Server Location:
+The backend services and file monitoring system run on the company’s main server machine.
+All file access and API requests are restricted to the internal company network (192.168.x.x),
+ensuring the system is fully protected and inaccessible from outside.
