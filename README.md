@@ -18,13 +18,21 @@ Managers can add, update, or remove user accounts and change user roles directly
 Roles automatically define department-based access permissions.
 
 Technical Stack:
+
 Mobile Application: Flutter (Dart)
+
 Backend API: Python FastAPI
+
 Database: PostgreSQL
+
 Real-Time File Monitoring: Python watchdog library
+
 Notification System: Firebase Cloud Messaging (FCM)
+
 Authentication & Authorization: JWT-based session management
+
 Secure Data Storage: .env environment variables, flutter_secure_storage for sensitive data
+
 Server Location:
 The backend services and file monitoring system run on the company’s main server machine.
 All file access and API requests are restricted to the internal company network (192.168.x.x),
