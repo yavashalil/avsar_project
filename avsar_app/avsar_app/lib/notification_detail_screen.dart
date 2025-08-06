@@ -5,7 +5,7 @@ class NotificationDetailScreen extends StatelessWidget {
   final String sender;
   final String subject;
   final String content;
-  final DateTime? timestamp; // null güvenliği
+  final DateTime? timestamp; 
 
   const NotificationDetailScreen({
     super.key,
