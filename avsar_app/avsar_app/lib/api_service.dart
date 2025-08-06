@@ -1,9 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiService {
-  final String baseUrl = 'http://10.0.2.2:5000';
+  final storage = const FlutterSecureStorage();
+  late String baseUrl;
+
+  ApiService() {
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
+  }
 
   Future<bool> loginUser(String username, String password) async {
     try {
@@ -16,11 +22,12 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('username', data['username'] ?? "Bilinmiyor");
-        await prefs.setString('role', data['role'] ?? "User");
-        await prefs.setString('email', data['email'] ?? "");
-        await prefs.setString('unit', data['unit'] ?? "");
+        // JWT token'ı güvenli şekilde sakla
+        await storage.write(key: 'token', value: data['access_token']);
+        await storage.write(key: 'username', value: data['username'] ?? "Bilinmiyor");
+        await storage.write(key: 'role', value: data['role'] ?? "User");
+        await storage.write(key: 'email', value: data['email'] ?? "");
+        await storage.write(key: 'unit', value: data['unit'] ?? "");
 
         return true;
       } else {
@@ -36,9 +43,15 @@ class ApiService {
   Future<bool> addUser(String name, String unit, String role, String username,
       String password) async {
     try {
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı");
+
       final response = await http.post(
         Uri.parse('$baseUrl/users/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
         body: jsonEncode({
           'name': name,
           'unit': unit,
@@ -48,74 +61,69 @@ class ApiService {
         }),
       );
 
-      if (response.statusCode == 201) {
-        print("Kullanıcı başarıyla eklendi.");
-        return true;
-      } else {
-        print("Kullanıcı ekleme başarısız: ${response.body}");
-        return false;
-      }
+      return response.statusCode == 201;
     } catch (e) {
-      print("Bağlantı hatası: $e");
+      print("Kullanıcı ekleme hatası: $e");
       return false;
     }
   }
 
   Future<bool> updateUser(
-      int userId, String name, String unit, String role) async {
+      String username, String name, String unit, String role) async {
     try {
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı");
+
       final response = await http.put(
-        Uri.parse('$baseUrl/users/$userId'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$baseUrl/users/$username'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
         body: jsonEncode({'name': name, 'unit': unit, 'role': role}),
       );
 
-      if (response.statusCode == 200) {
-        print("Kullanıcı başarıyla güncellendi.");
-        return true;
-      } else {
-        print("Kullanıcı güncelleme başarısız: ${response.body}");
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print("Bağlantı hatası: $e");
+      print("Kullanıcı güncelleme hatası: $e");
       return false;
     }
   }
 
-  Future<bool> deleteUser(int userId) async {
+  Future<bool> deleteUser(String username) async {
     try {
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı");
+
       final response = await http.delete(
-        Uri.parse('$baseUrl/users/$userId'),
+        Uri.parse('$baseUrl/users/$username'),
+        headers: {'Authorization': 'Bearer $token'},
       );
 
-      if (response.statusCode == 200) {
-        print("Kullanıcı başarıyla silindi.");
-        return true;
-      } else {
-        print("Kullanıcı silme başarısız: ${response.body}");
-        return false;
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print("Bağlantı hatası: $e");
+      print("Kullanıcı silme hatası: $e");
       return false;
     }
   }
 
   Future<List<Map<String, dynamic>>> fetchUsers() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/users/'));
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı");
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
       if (response.statusCode == 200) {
-        List<Map<String, dynamic>> fetchedUsers =
-            List<Map<String, dynamic>>.from(
-                jsonDecode(utf8.decode(response.bodyBytes)));
-        return fetchedUsers;
-      } else {
-        print("Kullanıcılar yüklenemedi! Hata kodu: ${response.statusCode}");
-        return [];
+        return List<Map<String, dynamic>>.from(
+            jsonDecode(utf8.decode(response.bodyBytes)));
       }
+      return [];
     } catch (e) {
-      print("Kullanıcıları çekerken hata oluştu: $e");
+      print("Kullanıcıları çekerken hata: $e");
       return [];
     }
   }
