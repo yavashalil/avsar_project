@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 
 class SendNotificationScreen extends StatefulWidget {
   const SendNotificationScreen({super.key});
@@ -17,59 +18,87 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   String subject = '';
   List<String> users = [];
 
+  final storage = const FlutterSecureStorage();
+  late String baseUrl;
+
   @override
   void initState() {
     super.initState();
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
     fetchUsers();
   }
 
   Future<void> fetchUsers() async {
     try {
-      final response = await http.get(Uri.parse('http://10.0.2.2:5000/users/'));
+      final token = await storage.read(key: 'token');
+      if (token == null) throw Exception("Token bulunamadı");
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/'),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
-          users =
-              data.map<String>((user) => user['username'] as String).toList();
+          users = data.map<String>((user) => user['username'] as String).toList();
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kullanıcılar alınamadı')),
-        );
+        _showSnack("Kullanıcılar alınamadı (Kod: ${response.statusCode})");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e')),
-      );
+      _showSnack("Hata: $e");
     }
   }
 
   Future<void> sendNotification() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String sender = prefs.getString('username') ?? 'admin';
+    try {
+      final token = await storage.read(key: 'token');
+      final sender = await storage.read(key: 'username') ?? 'admin';
 
-    final response = await http.post(
-      Uri.parse('http://10.0.2.2:5000/messages/send'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'sender_username': sender,
-        'receiver_username': selectedUser,
-        'subject': subject,
-        'content': message,
-        'file_path': null,
-        'reply_to': null
-      }),
-    );
+      if (token == null) throw Exception("Token bulunamadı");
 
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bildirim gönderildi!')),
+      final response = await http.post(
+        Uri.parse('$baseUrl/messages/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+        body: jsonEncode({
+          'sender_username': sender,
+          'receiver_username': selectedUser.trim(),
+          'subject': subject.trim(),
+          'content': message.trim(),
+          'file_path': null,
+          'reply_to': null
+        }),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: ${response.body}')),
-      );
+
+      if (response.statusCode == 200) {
+        _showSnack("Bildirim gönderildi!");
+      } else {
+        _showSnack("Hata: ${response.body}");
+      }
+    } catch (e) {
+      _showSnack("Gönderim hatası: $e");
     }
+  }
+
+  void _showSnack(String text) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
+  }
+
+  String? _validateMessage(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Mesaj boş olamaz';
+    if (value.length > 500) return 'Mesaj 500 karakteri geçemez';
+    return null;
+  }
+
+  String? _validateSubject(String? value) {
+    if (value != null && value.length > 100) return 'Konu 100 karakteri geçemez';
+    return null;
   }
 
   @override
@@ -94,97 +123,46 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
               children: [
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Kullanıcı Seç',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  child: Text('Kullanıcı Seç', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<String>(
                   value: selectedUser.isNotEmpty ? selectedUser : null,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  items: users.map((user) {
-                    return DropdownMenuItem<String>(
-                      value: user,
-                      child: Text(user),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedUser = value!;
-                    });
-                  },
+                  decoration: _inputDecoration(),
+                  items: users.isNotEmpty
+                      ? users.map((user) => DropdownMenuItem(value: user, child: Text(user))).toList()
+                      : [const DropdownMenuItem(value: '', child: Text("Kullanıcı bulunamadı"))],
+                  onChanged: (value) => setState(() => selectedUser = value ?? ''),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Lütfen bir kullanıcı seçin';
-                    }
+                    if (value == null || value.isEmpty) return 'Lütfen bir kullanıcı seçin';
                     return null;
                   },
                 ),
                 const SizedBox(height: 15),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Konu',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  child: Text('Konu', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 6),
                 TextFormField(
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    subject = value;
-                  },
+                  decoration: _inputDecoration(),
+                  onChanged: (value) => subject = value,
+                  validator: _validateSubject,
                 ),
                 const SizedBox(height: 14),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Mesaj',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  child: Text('Mesaj', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 4),
                 Expanded(
                   child: TextFormField(
                     expands: true,
                     maxLines: null,
-                    minLines: null,
                     textAlignVertical: TextAlignVertical.top,
-                    decoration: InputDecoration(
-                      hintText: 'Bildirim içeriğini yazın...',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      message = value;
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Mesaj boş olamaz';
-                      }
-                      return null;
-                    },
+                    decoration: _inputDecoration(hintText: 'Bildirim içeriğini yazın...'),
+                    onChanged: (value) => message = value,
+                    validator: _validateMessage,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -192,22 +170,15 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.send, color: Colors.white),
-                    label: const Text(
-                      'Gönder',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                    label: const Text('Gönder', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.purple,
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 6,
                     ),
                     onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        sendNotification();
-                      }
+                      if (_formKey.currentState!.validate()) sendNotification();
                     },
                   ),
                 ),
@@ -216,6 +187,16 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  InputDecoration _inputDecoration({String? hintText}) {
+    return InputDecoration(
+      hintText: hintText,
+      filled: true,
+      fillColor: Colors.grey[100],
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
     );
   }
 }
