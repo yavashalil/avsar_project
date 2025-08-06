@@ -178,7 +178,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Admin role kontrolü
             if (role == "Admin")
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
