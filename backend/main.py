@@ -170,7 +170,6 @@ def open_file(file_path: str):
     decoded = unquote(file_path, encoding="utf-8")
     absolute_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded))
     
-    # Path güvenliği
     if os.path.commonpath([absolute_path, os.path.abspath(ORTAK_DOSYA_YOLU)]) != os.path.abspath(ORTAK_DOSYA_YOLU):
         raise HTTPException(status_code=403, detail="Erişim reddedildi")
 
@@ -207,7 +206,6 @@ def browse_folder(path: Optional[str] = Query(default=""), username: str = Query
         decoded_path = unquote(path)
         full_path = os.path.abspath(os.path.join(ORTAK_DOSYA_YOLU, decoded_path))
 
-        # Path güvenliği
         if os.path.commonpath([full_path, os.path.abspath(ORTAK_DOSYA_YOLU)]) != os.path.abspath(ORTAK_DOSYA_YOLU):
             raise HTTPException(status_code=403, detail="Geçersiz erişim")
         
