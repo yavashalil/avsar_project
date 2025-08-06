@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'admin_screen.dart';
 import 'file_management_screen.dart';
 import 'profile_settings_screen.dart';
@@ -7,39 +8,51 @@ import 'send_notification_screen.dart';
 import 'notification_inbox_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  final String baseUrl;
-
-  const AdminDashboardScreen({super.key, required this.baseUrl});
+  const AdminDashboardScreen({super.key});
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  final storage = const FlutterSecureStorage();
   String name = "";
   String unit = "";
   String role = "";
   String username = "";
+  String baseUrl = "";
 
   @override
   void initState() {
     super.initState();
+    _loadEnv();
     _loadUserData();
   }
 
-  Future<void> _loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+  Future<void> _loadEnv() async {
+    // .env içinden baseUrl çek
     setState(() {
-      name = prefs.getString('name') ?? "Bilinmiyor";
-      unit = prefs.getString('unit') ?? "Bilinmiyor";
-      role = prefs.getString('role') ?? "Bilinmiyor";
-      username = prefs.getString('username') ?? "default_user";
+      baseUrl = dotenv.env['BASE_URL'] ?? '';
+    });
+  }
+
+  Future<void> _loadUserData() async {
+    // Secure Storage'dan verileri oku
+    String? storedName = await storage.read(key: 'name');
+    String? storedUnit = await storage.read(key: 'unit');
+    String? storedRole = await storage.read(key: 'role');
+    String? storedUsername = await storage.read(key: 'username');
+
+    setState(() {
+      name = storedName ?? "Bilinmiyor";
+      unit = storedUnit ?? "Bilinmiyor";
+      role = storedRole ?? "Bilinmiyor";
+      username = storedUsername ?? "default_user";
     });
   }
 
   void _logout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await storage.deleteAll();
     Navigator.pushReplacementNamed(context, "/login");
   }
 
@@ -94,27 +107,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.send, color: Colors.purple),
-                  title: const Text("Bildirim Gönder"),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SendNotificationScreen(),
-                      ),
-                    );
-                  },
+
+            if (role == "Admin")
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ListTile(
+                    leading: const Icon(Icons.send, color: Colors.purple),
+                    title: const Text("Bildirim Gönder"),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SendNotificationScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
+
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Card(
@@ -190,37 +206,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ),
             const SizedBox(height: 130),
-            Center(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          AdminScreen(baseUrl: widget.baseUrl),
-                    ),
-                  );
-                },
-                child: const Text(
-                  "Kullanıcı Yönetimi",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+
+            if (role == "Admin")
+              Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AdminScreen(baseUrl: baseUrl),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    "Kullanıcı Yönetimi",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 20),
+
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -229,7 +245,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => FileManagementScreen(
-                        baseUrl: widget.baseUrl,
+                        baseUrl: baseUrl,
                         username: username,
                       ),
                     ),
@@ -246,8 +262,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
