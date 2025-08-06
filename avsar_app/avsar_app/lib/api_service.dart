@@ -21,8 +21,6 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // JWT token'ı güvenli şekilde sakla
         await storage.write(key: 'token', value: data['access_token']);
         await storage.write(key: 'username', value: data['username'] ?? "Bilinmiyor");
         await storage.write(key: 'role', value: data['role'] ?? "User");
