@@ -1,19 +1,18 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class FileManagementScreen extends StatefulWidget {
-  final String baseUrl;
   final String? initialPath;
   final String username;
 
   const FileManagementScreen({
     super.key,
-    required this.baseUrl,
     required this.username,
     this.initialPath,
   });
@@ -23,120 +22,103 @@ class FileManagementScreen extends StatefulWidget {
 }
 
 class _FileManagementScreenState extends State<FileManagementScreen> {
+  final storage = const FlutterSecureStorage();
   List<Map<String, dynamic>> files = [];
   bool isLoading = true;
   String currentPath = "";
+  late String baseUrl;
   late String username;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final prefs = await SharedPreferences.getInstance();
-      username = prefs.getString("username") ?? widget.username;
-      await _initialize();
-    });
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
+    username = widget.username;
+    _initialize();
   }
 
   Future<void> _initialize() async {
     setState(() => isLoading = true);
 
     if (widget.initialPath != null && widget.initialPath!.isNotEmpty) {
-      print("Bildirimden gelen dosya açılıyor: ${widget.initialPath!}");
-
       String sanitizedPath = Uri.decodeFull(widget.initialPath!);
-      print("Path temizlenmeden: $sanitizedPath");
 
       if (sanitizedPath.startsWith("ORTAK/")) {
         sanitizedPath = sanitizedPath.replaceFirst("ORTAK/", "");
-        print("ORTAK/ kaldırıldı: $sanitizedPath");
+      }
+
+      if (sanitizedPath.contains("..")) {
+        _showSnack("Geçersiz dosya yolu!");
+        setState(() => isLoading = false);
+        return;
       }
 
       try {
         await openFileFromServer(sanitizedPath);
       } catch (e) {
-        print("Dosya açma hatası: $e");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Dosya açılamadı: $e")),
-          );
-        }
+        _showSnack("Dosya açılamadı: $e");
       }
 
       final folderPath = sanitizedPath.contains("/")
           ? sanitizedPath.substring(0, sanitizedPath.lastIndexOf("/"))
           : "";
-
-      print("Klasör listelenecek path: $folderPath");
       await fetchFiles(folderPath);
     } else {
       await fetchFiles();
     }
 
-    if (mounted) setState(() => isLoading = false);
+    setState(() => isLoading = false);
   }
 
   Future<void> fetchFiles([String path = ""]) async {
-    final prefs = await SharedPreferences.getInstance();
-    username = prefs.getString('username') ?? widget.username;
-
-    print(
-        "fetchFiles çağrısı: ${widget.baseUrl}/files/browse?path=${Uri.encodeFull(path)}&username=$username");
-
     setState(() {
       isLoading = true;
       currentPath = path;
     });
 
     try {
+      final token = await storage.read(key: 'token');
       final uri = Uri.parse(
-          "${widget.baseUrl}/files/browse?path=${Uri.encodeFull(path)}&username=$username");
+          "$baseUrl/files/browse?path=${Uri.encodeFull(path)}&username=$username");
 
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: {
+        "Authorization": "Bearer $token",
+      });
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
         final List<Map<String, dynamic>> fetchedFiles =
             List<Map<String, dynamic>>.from(decoded);
 
-        print("fetchFiles tamamlandı. ${fetchedFiles.length} dosya bulundu");
-
-        if (mounted) {
-          setState(() {
-            files = fetchedFiles;
-            isLoading = false;
-          });
-        }
+        setState(() {
+          files = fetchedFiles;
+          isLoading = false;
+        });
       } else {
         throw Exception("HTTP ${response.statusCode}: Dosya alınamadı");
       }
     } catch (e) {
-      print("Dosya alma hatası: $e");
-      if (mounted) {
-        setState(() => isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Dosya alınırken hata: $e")),
-        );
-      }
+      _showSnack("Dosya alınırken hata: $e");
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> openFileFromServer(String relativePath) async {
     try {
       if (relativePath.contains('%7E%24') || relativePath.contains('~\$')) {
-        print("Geçici dosya tespit edildi, açma atlandı.");
         return;
       }
 
+      final token = await storage.read(key: 'token');
       final encodedPath = Uri.encodeFull(relativePath);
-      final url = "${widget.baseUrl}/files/open/$encodedPath";
-      print("Tam URL (encoded): $url");
+      final url = "$baseUrl/files/open/$encodedPath";
 
-      final response = await http.get(Uri.parse(url));
-      print("HTTP Durum: ${response.statusCode}");
+      final response = await http.get(Uri.parse(url), headers: {
+        "Authorization": "Bearer $token",
+      });
 
       if (response.statusCode != 200) {
-        throw Exception("Dosya indirilemedi.");
+        throw Exception("Dosya indirilemedi (${response.statusCode})");
       }
 
       final tempDir = await getTemporaryDirectory();
@@ -144,42 +126,38 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
       final safeName = fileName.replaceAll("%", "_");
       final filePath = "${tempDir.path}/$safeName";
 
-      print("Dosya yazılıyor: $filePath");
       final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
 
-      print("Dosya açılıyor...");
       final result = await OpenFile.open(filePath);
-      print("Açma sonucu: ${result.message}");
-
       if (result.type != ResultType.done) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Dosya açılamadı: ${result.message}")),
-        );
+        _showSnack("Dosya açılamadı: ${result.message}");
       }
     } catch (e) {
-      print("Hata: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(" Dosya açılırken hata: $e")),
-        );
-      }
+      _showSnack("Dosya açılırken hata: $e");
     }
   }
 
   void navigateIntoFolder(String folderName) {
+    if (folderName.contains("..")) {
+      _showSnack("Geçersiz klasör yolu!");
+      return;
+    }
     final newPath =
         currentPath.isEmpty ? folderName : "$currentPath/$folderName";
     fetchFiles(newPath);
+  }
+
+  void _showSnack(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   bool get isInSubFolder => currentPath.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
-    print(
-        "build() çalıştı | isLoading: $isLoading | Dosya sayısı: ${files.length}");
-
     return Scaffold(
       appBar: AppBar(
         title:
@@ -226,12 +204,14 @@ class _FileManagementScreenState extends State<FileManagementScreen> {
                                   : Icons.folder_rounded,
                               color: isFile ? Colors.blueGrey : Colors.orange,
                             ),
-                            title: Text(name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    overflow: TextOverflow.ellipsis)),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  overflow: TextOverflow.ellipsis),
+                            ),
                             subtitle: isFile && date.isNotEmpty
-                                ? Text("📅 $date",
+                                ? Text("$date",
                                     style: const TextStyle(color: Colors.grey))
                                 : null,
                             onTap: () {
