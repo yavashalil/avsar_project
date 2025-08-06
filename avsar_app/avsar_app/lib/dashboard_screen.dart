@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:open_file/open_file.dart';
@@ -17,6 +18,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final storage = const FlutterSecureStorage();
   String name = "Bilinmiyor";
   String unit = "Bilinmiyor";
   String role = "Bilinmiyor";
@@ -25,22 +27,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool isLoadingFiles = true;
   String currentPath = "";
 
-  final String baseUrl = "http://10.0.2.2:5000";
+  late String baseUrl;
 
   @override
   void initState() {
     super.initState();
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
     loadUserData();
   }
 
   Future<void> loadUserData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      name = prefs.getString('name') ?? "Bilinmiyor";
-      unit = prefs.getString('unit') ?? "Bilinmiyor";
-      role = prefs.getString('role') ?? "Bilinmiyor";
-      username = prefs.getString('username') ?? "";
-    });
+    name = await storage.read(key: 'name') ?? "Bilinmiyor";
+    unit = await storage.read(key: 'unit') ?? "Bilinmiyor";
+    role = await storage.read(key: 'role') ?? "Bilinmiyor";
+    username = await storage.read(key: 'username') ?? "";
+
+    if (mounted) setState(() {});
     fetchFiles();
   }
 
@@ -49,10 +51,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       isLoadingFiles = true;
       currentPath = path;
     });
+
     try {
+      final token = await storage.read(key: 'token');
       final uri = Uri.parse(
           "$baseUrl/files/browse?path=${Uri.encodeComponent(path)}&username=$username");
-      final response = await http.get(uri);
+
+      final response = await http.get(uri, headers: {
+        "Authorization": "Bearer $token",
+      });
+
       if (response.statusCode == 200) {
         setState(() {
           files = List<Map<String, dynamic>>.from(
@@ -60,17 +68,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isLoadingFiles = false;
         });
       } else {
-        throw Exception("Dosyalar alınamadı");
+        throw Exception("Dosyalar alınamadı (${response.statusCode})");
       }
     } catch (e) {
       setState(() => isLoadingFiles = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Dosya alınırken hata oluştu: $e")),
+        SnackBar(content: Text("Dosya alınırken hata: $e")),
       );
     }
   }
 
   void navigateIntoFolderOrFile(String name, bool isFile) async {
+    if (name.contains("..")) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Geçersiz dosya yolu")),
+      );
+      return;
+    }
+
     final newPath = currentPath.isEmpty ? name : "$currentPath/$name";
     if (isFile) {
       await openFile(newPath);
@@ -80,22 +95,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> openFile(String relativePath) async {
-    final url =
-        Uri.parse("$baseUrl/files/open/${Uri.encodeComponent(relativePath)}");
-
     try {
-      final response = await http.get(url);
+      final token = await storage.read(key: 'token');
+      final url = Uri.parse("$baseUrl/files/open/${Uri.encodeComponent(relativePath)}");
+
+      final response = await http.get(url, headers: {
+        "Authorization": "Bearer $token",
+      });
+
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final dir = await getTemporaryDirectory();
         final fileName = relativePath.split('/').last;
         final filePath = "${dir.path}/$fileName";
-        final file = File(filePath);
 
+        final file = File(filePath);
         await file.writeAsBytes(bytes);
         await OpenFile.open(filePath);
       } else {
-        throw Exception("Dosya indirilemedi");
+        throw Exception("Dosya indirilemedi (${response.statusCode})");
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,8 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void logout() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await storage.deleteAll();
     if (mounted) {
       Navigator.pushReplacementNamed(context, "/login");
     }
@@ -143,62 +160,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Color(0xFF6A1B9A),
                   ],
                 ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
+                  Text(name,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold)),
                   Text("Birim: $unit",
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 15)),
+                      style: const TextStyle(color: Colors.white70)),
                   Text("Yetki: $role",
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 15)),
+                      style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.send, color: Colors.purple),
-                  title: const Text("Bildirim Gönder"),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const SendNotificationScreen()),
-                    );
-                  },
+
+            // Admin role kontrolü
+            if (role == "Admin")
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.send, color: Colors.purple),
+                    title: const Text("Bildirim Gönder"),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                const SendNotificationScreen()),
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
+
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
               child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
                 child: ListTile(
                   leading:
                       const Icon(Icons.notifications, color: Colors.purple),
@@ -218,122 +220,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       appBar: AppBar(
-        centerTitle: true,
-        title: const Text(
-          "Avsar App",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        title: const Text("Avsar App"),
         backgroundColor: Colors.purple,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           if (isInSubFolder)
             IconButton(
               icon: const Icon(Icons.arrow_back_ios),
-              tooltip: "Geri",
               onPressed: navigateBack,
             )
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.purple,
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : "?",
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                title: Text(name,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
-                subtitle: Text("Birim: $unit | Yetki: $role"),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const ProfileSettingsScreen()),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: isLoadingFiles
-                  ? const Center(child: CircularProgressIndicator())
-                  : files.isEmpty
-                      ? const Center(
-                          child: Text("Hiç dosya veya klasör yok.",
-                              style:
-                                  TextStyle(fontSize: 16, color: Colors.grey)),
-                        )
-                      : ListView.builder(
-                          itemCount: files.length,
-                          itemBuilder: (context, index) {
-                            final file = files[index];
-                            final name = file["name"] ?? "-";
-                            final isFile = file["type"] == "file";
-                            final date = file["date"] ?? "";
+      body: isLoadingFiles
+          ? const Center(child: CircularProgressIndicator())
+          : files.isEmpty
+              ? const Center(child: Text("Hiç dosya yok"))
+              : ListView.builder(
+                  itemCount: files.length,
+                  itemBuilder: (context, index) {
+                    final file = files[index];
+                    final name = file["name"] ?? "-";
+                    final isFile = file["type"] == "file";
+                    final date = file["date"] ?? "";
 
-                            return Card(
-                              elevation: 2,
-                              margin: const EdgeInsets.symmetric(vertical: 6),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ListTile(
-                                leading: Icon(
-                                  isFile
-                                      ? Icons.insert_drive_file_rounded
-                                      : Icons.folder_rounded,
-                                  color:
-                                      isFile ? Colors.blueGrey : Colors.orange,
-                                ),
-                                title: Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w500),
-                                ),
-                                subtitle: isFile && date.isNotEmpty
-                                    ? Text("📅 $date",
-                                        style:
-                                            const TextStyle(color: Colors.grey))
-                                    : null,
-                                onTap: () =>
-                                    navigateIntoFolderOrFile(name, isFile),
-                              ),
-                            );
-                          },
+                    return Card(
+                      child: ListTile(
+                        leading: Icon(
+                          isFile
+                              ? Icons.insert_drive_file
+                              : Icons.folder,
+                          color: isFile ? Colors.blueGrey : Colors.orange,
                         ),
-            ),
-            const Divider(),
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: logout,
-                icon: const Icon(Icons.exit_to_app, color: Colors.white),
-                label: const Text("Çıkış Yap"),
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                        title: Text(name),
+                        subtitle:
+                            isFile && date.isNotEmpty ? Text("$date") : null,
+                        onTap: () =>
+                            navigateIntoFolderOrFile(name, isFile),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-          ],
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: ElevatedButton.icon(
+          onPressed: logout,
+          icon: const Icon(Icons.exit_to_app, color: Colors.white),
+          label: const Text("Çıkış Yap"),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
         ),
       ),
     );
