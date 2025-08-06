@@ -15,7 +15,7 @@ from database import get_db, Base, engine
 from message_routes import router as message_router
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv() //
 
 ORTAK_DOSYA_YOLU = os.getenv("ORTAK_DOSYA_YOLU")
 unit_access_map = json.loads(os.getenv("UNIT_ACCESS_MAP"))
