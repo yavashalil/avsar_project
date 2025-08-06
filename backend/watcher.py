@@ -10,38 +10,17 @@ from firebase_admin import credentials, messaging
 from threading import Timer
 from collections import defaultdict
 from urllib.parse import quote
+from dotenv import load_dotenv
 
+load_dotenv()
 
-DATABASE_URL = "postgresql://postgres:<şifre>@localhost:5432/avsar_db"
-IZLENECEK_KLASORLER = [
-    r"\\192.168.2.7\data\ORTAK\KALİTE\4. FORMLAR",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\10. TALİMATLAR",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\11. PROSEDÜrLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\3. PLANLAR",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\2.TEHLİKE ANALİZLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\5. HAMMADDE-ÜRÜN TANIMLARI",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2021\DÜZELTİCİ FAALİYETLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2022\DÜZELTİCİ FAALİYETLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2023\DÜZELTİCİ FAALİYETLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2024\DÜZELTİCİ FAALİYETLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2025\DÜZELTİCİ FAALİYETLER",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2021\MÜŞTERİ BİLDİRİMLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2022\MÜŞTERİ BİLDİRİMLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2023\MÜŞTERİ BİLDİRİMLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2024\MÜŞTERİ BİLDİRİMLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2025\MÜŞTERİ BİLDİRİMLERİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2021\UYGUNSUZ ÜRÜN\UYGUN OLMAYAN ÜRÜN TAKİBİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2022\UYGUNSUZ ÜRÜN\UYGUN OLMAYAN ÜRÜN TAKİBİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2023\UYGUNSUZ ÜRÜN\UYGUN OLMAYAN ÜRÜN TAKİBİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2024\UYGUNSUZ ÜRÜN\UYGUN OLMAYAN ÜRÜN TAKİBİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\21. UYGULAMALAR\2025\UYGUNSUZ ÜRÜN\UYGUN OLMAYAN ÜRÜN TAKİBİ",
-    r"\\192.168.2.7\data\ORTAK\KALİTE\22. ÜRETİM UYGULAMALAR\ÜRETİM VERİMİ",
-] 
-LOG_DOSYASI = "kalite_dosya_loglari.txt"
+DATABASE_URL = os.getenv("DATABASE_URL")
+IZLENECEK_KLASORLER = os.getenv("WATCH_FOLDERS", "").split(";")
+LOG_DOSYASI = os.getenv("LOG_FILE", "kalite_dosya_loglari.txt")
 GECERLI_UZANTILAR = [".xlsx", ".xls", ".csv", ".pdf", ".doc", ".docx"]
 
-FIREBASE_CRED_PATH = os.path.join(os.path.dirname(__file__), "service-account.json")
-FCM_TEST_DEVICE_TOKEN = "fnZgpDXHRnqP4bjH7elkx7:APA91bHr2Z_DHgyuO8rqf1WqzdHpavcvK-c_38LWp3AX6hEry2bsJQ0XcArKBxF1NIMIigOd0FHS-gCdJoPtaTDSgsw0mElQmR_8hxh-W8wC0l2HvDLoADw"
+FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", os.path.join(os.path.dirname(__file__), "service-account.json"))
+FCM_TEST_DEVICE_TOKEN = os.getenv("FCM_TEST_DEVICE_TOKEN")
 
 if not firebase_admin._apps:
     cred = credentials.Certificate(FIREBASE_CRED_PATH)
