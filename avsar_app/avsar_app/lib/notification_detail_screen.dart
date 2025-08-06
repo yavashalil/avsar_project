@@ -5,7 +5,7 @@ class NotificationDetailScreen extends StatelessWidget {
   final String sender;
   final String subject;
   final String content;
-  final DateTime timestamp;
+  final DateTime? timestamp; // null güvenliği
 
   const NotificationDetailScreen({
     super.key,
@@ -15,8 +15,29 @@ class NotificationDetailScreen extends StatelessWidget {
     required this.timestamp,
   });
 
+  String _sanitize(String input) {
+    String safe = input.trim();
+    if (safe.length > 500) {
+      safe = safe.substring(0, 500) + "...";
+    }
+    return safe;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final safeSender = _sanitize(sender.isNotEmpty ? sender : "Bilinmiyor");
+    final safeSubject = _sanitize(subject);
+    final safeContent = _sanitize(content.isNotEmpty ? content : "Mesaj yok");
+
+    String dateString = "Tarih Yok";
+    if (timestamp != null) {
+      try {
+        dateString = DateFormat('dd MMMM yyyy / HH:mm', 'tr_TR').format(timestamp!);
+      } catch (e) {
+        dateString = "Geçersiz Tarih";
+      }
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFFDF0FA),
       appBar: AppBar(
@@ -38,8 +59,7 @@ class NotificationDetailScreen extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: ListView(
               children: [
                 Row(
                   children: [
@@ -47,11 +67,12 @@ class NotificationDetailScreen extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        sender,
+                        safeSender,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -63,22 +84,21 @@ class NotificationDetailScreen extends StatelessWidget {
                         color: Colors.purple, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      DateFormat('dd MMMM yyyy / HH:mm', 'tr_TR')
-                          .format(timestamp),
+                      dateString,
                       style:
                           const TextStyle(fontSize: 16, color: Colors.black87),
                     ),
                   ],
                 ),
                 const SizedBox(height: 28),
-                if (subject.isNotEmpty) ...[
+                if (safeSubject.isNotEmpty) ...[
                   const Text(
                     'Konu',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    subject,
+                    safeSubject,
                     style: const TextStyle(fontSize: 17),
                   ),
                   const SizedBox(height: 24),
@@ -89,7 +109,7 @@ class NotificationDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  content,
+                  safeContent,
                   style: const TextStyle(fontSize: 17),
                 ),
               ],
