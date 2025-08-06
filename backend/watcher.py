@@ -16,7 +16,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 WATCH_FOLDERS = os.getenv("WATCH_FOLDERS", "").split(";")
-WATCH_BASE_PATH = os.getenv("WATCH_BASE_PATH", r"\\192.168.2.7\data")
+WATCH_BASE_PATH = os.getenv("WATCH_BASE_PATH")
 LOG_FILE = os.getenv("LOG_FILE", "kalite_dosya_loglari.txt")
 FIREBASE_CRED_PATH = os.getenv("FIREBASE_CRED_PATH", os.path.join(os.path.dirname(__file__), "service-account.json"))
 FCM_TEST_DEVICE_TOKEN = os.getenv("FCM_TEST_DEVICE_TOKEN")
