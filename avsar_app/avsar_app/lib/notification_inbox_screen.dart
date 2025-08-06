@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'notification_detail_screen.dart';
 
@@ -14,45 +15,73 @@ class NotificationInboxScreen extends StatefulWidget {
 }
 
 class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
+  final storage = const FlutterSecureStorage();
   List<dynamic> messages = [];
   bool isLoading = true;
+  late String baseUrl;
 
   @override
   void initState() {
     super.initState();
+    baseUrl = dotenv.env['BASE_URL'] ?? '';
     fetchMessages();
   }
 
   Future<void> fetchMessages() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String username = prefs.getString('username') ?? "";
-
+    setState(() => isLoading = true);
     try {
+      final username = await storage.read(key: 'username') ?? "";
+      final token = await storage.read(key: 'token');
+
+      if (username.isEmpty || token == null) {
+        throw Exception("Kullanıcı bilgisi veya token bulunamadı.");
+      }
+
       final response = await http.get(
-        Uri.parse("http://10.0.2.2:5000/messages/inbox/$username"),
+        Uri.parse("$baseUrl/messages/inbox/$username"),
+        headers: {
+          "Authorization": "Bearer $token",
+        },
       );
 
       if (response.statusCode == 200) {
-        setState(() {
-          messages = jsonDecode(response.body);
-          isLoading = false;
-        });
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          setState(() {
+            messages = decoded;
+            isLoading = false;
+          });
+        } else {
+          throw Exception("Geçersiz API yanıtı.");
+        }
       } else {
         throw Exception("Sunucu hatası: ${response.statusCode}");
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: $e')),
-      );
+      setState(() => isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
     }
   }
 
-  String formatTimestamp(String timestamp) {
-    final dateTime = DateTime.parse(timestamp);
-    return DateFormat('dd-MM-yyyy / HH:mm').format(dateTime);
+  String formatTimestamp(String? timestamp) {
+    if (timestamp == null || timestamp.isEmpty) return "Tarih Yok";
+    try {
+      final dateTime = DateTime.parse(timestamp);
+      return DateFormat('dd-MM-yyyy / HH:mm').format(dateTime);
+    } catch (_) {
+      return "Geçersiz Tarih";
+    }
+  }
+
+  String sanitize(String? input) {
+    if (input == null || input.trim().isEmpty) return "-";
+    return input.trim().length > 200
+        ? "${input.trim().substring(0, 200)}..."
+        : input.trim();
   }
 
   @override
@@ -77,6 +106,11 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
+                    final content = sanitize(msg['content']);
+                    final sender = sanitize(msg['sender_username']);
+                    final subject = sanitize(msg['subject']);
+                    final timestamp = formatTimestamp(msg['timestamp']);
+
                     return Card(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -84,22 +118,23 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                       elevation: 3,
                       child: ListTile(
                         title: Text(
-                          msg['content'] ?? '',
+                          content,
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        subtitle: Text(
-                          "Gönderen: ${msg['sender_username']}\n${formatTimestamp(msg['timestamp'].toString())}",
-                        ),
+                        subtitle: Text("Gönderen: $sender\n$timestamp"),
                         isThreeLine: true,
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => NotificationDetailScreen(
-                                sender: msg['sender_username'],
-                                subject: msg['subject'] ?? '',
-                                content: msg['content'] ?? '',
-                                timestamp: DateTime.parse(msg['timestamp']),
+                                sender: sender,
+                                subject: subject,
+                                content: content,
+                                timestamp: DateTime.tryParse(
+                                      msg['timestamp'] ?? '',
+                                    ) ??
+                                    DateTime.now(),
                               ),
                             ),
                           );
